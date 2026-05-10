@@ -40,6 +40,7 @@ async def chunk_document(f, file_bytes):
     if f.content_type == "application/pdf" or f.content_type == "application/epub+zip":
         filetype = filetype_map.get(f.content_type, "pdf")
         doc = fitz.open(stream=file_bytes, filetype=filetype)
+        len_doc = len(doc)
         
         text = ""
         for page in doc:
@@ -55,7 +56,7 @@ async def chunk_document(f, file_bytes):
         chunk_overlap=50,
     )
         
-    return splitter.split_text(text), len(doc)
+    return splitter.split_text(text), len_doc
  
 ## Upload user_document per chat, add TTL
 async def save_chunks_session_to_db(pool, chunks, pages, f, configurable, prompt):
@@ -82,6 +83,8 @@ async def save_chunks_session_to_db(pool, chunks, pages, f, configurable, prompt
         *(encrypt(chunk) for chunk in chunks)
     )
     
+    encrypt_metadata = await encrypt(metadata)
+
     records = [
         (uuid.uuid4(), s_knowledge_id, tenant_id, user_id, chunk, vec)
         for chunk, vec in zip(encrypted_chunks, vector)
@@ -93,7 +96,7 @@ async def save_chunks_session_to_db(pool, chunks, pages, f, configurable, prompt
         async with pool.acquire() as conn:
             await conn.execute(
                 queries.INPUT_SESSION_KNOWLEDGES,
-                s_knowledge_id, tenant_id, user_id, encrypt(metadata)
+                s_knowledge_id, tenant_id, user_id, encrypt_metadata
             )
             
             await conn.executemany(
@@ -149,25 +152,33 @@ async def save_chunks_to_db(pool, chunks, pages, f, tenant_id):
         "content-type": content_type,
         "pages": pages,
     }
-    
+
     vector = await gemini_embedding.aembed_documents(chunks)
+    print("len_vector:", len(vector), ", len_chunks:", len(chunks))
+    print("type_vector:", type(vector), ", type_chunks:", type(chunks))
+    print("len vector 0", len(vector[0]))
+    # print(chunks[0])
     
     encrypted_chunks = await asyncio.gather(
         *(encrypt(chunk) for chunk in chunks)
     )
+    print("encrypted_chunks:", len(encrypted_chunks))
+    
+    encrypted_metadata = await encrypt(metadata)
 
     records = [
         (uuid.uuid4(), knowledge_id, tenant_id, chunk, vec)
         for chunk, vec in zip(encrypted_chunks, vector)
-    ]
+    ] 
     
     chunk_ids = [r[0] for r in records]
+    print(chunk_ids)
     
     try:
         async with pool.acquire() as conn:
             await conn.execute(
                 queries.INPUT_KNOWLEDGES,
-                knowledge_id, tenant_id, encrypt(metadata)
+                knowledge_id, tenant_id, encrypted_metadata
             )
             
             await conn.executemany(
