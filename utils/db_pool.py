@@ -5,8 +5,6 @@ from fastapi import HTTPException
 
 load_dotenv()
 
-# supabase_key = os.getenv("SUPABASE_KEY")
-# supabase_url = os.getenv("SUPABASE_URL")
 database_url = os.getenv("DATABASE_URL")
 
 _db_pool = None

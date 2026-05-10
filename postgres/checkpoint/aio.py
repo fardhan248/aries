@@ -24,7 +24,7 @@ from psycopg_pool import AsyncConnectionPool
 
 from langgraph.checkpoint.postgres import _ainternal
 # from langgraph.checkpoint.postgres.base import BasePostgresSaver
-from base import BasePostgresSaver
+from .base import BasePostgresSaver
 from langgraph.checkpoint.postgres.shallow import AsyncShallowPostgresSaver
 
 Conn = _ainternal.Conn  # For backward compatibility
