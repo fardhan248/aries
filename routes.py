@@ -1,31 +1,36 @@
-from fastapi import Request, APIRouter, UploadFile, File
+from fastapi import Request, APIRouter, UploadFile, File, Form, Body
 from fastapi.responses import StreamingResponse
-from langgraph_core import streaming, put_new_knowledge, chat, get_agent_graph
+from src.chat_completion import streaming, chat_workflow, get_agent_graph
+from utils.documents_utils import put_new_knowledge
 from typing import Optional
-import uuid
+from src.add_member import new_company, new_user
+from body_models.router_models import AddUserInput, ChatInput
+from utils.health_check import health_check
+import uuid, json
 
 router = APIRouter()
 
-@router.get("/")
+@router.get("/") #✅
 async def root():
     return {"message": "Chatbot Nusantara is running"}
 
-@router.get("/hello")
+
+@router.get("/hello") #✅
 async def hello():
-    return {"Hello, World!"}
+    return {"message": "Hello, World!"}
 
-# @router.get("/get_graph")
-# async def get_graph(request: Request, input_data: dict):
-    # pool = request.app.state.pool
-    # for chunk in agent(pool, input_data):
-        # return {"messages": chunk}
-
-# Di sini kumpulan router api langgraph
 
 # Stream langgraph
-@router.post("/stream_chat")
-async def stream_chat(request: Request, input_data: dict, f: Optional[UploadFile] = File(None)):
+@router.post("/chat/stream_chat/{thread_id}")
+async def stream_chat(
+    request: Request, 
+    thread_id: uuid.UUID, 
+    input_data: str = Form(...), 
+    f: Optional[UploadFile] = File(None),
+):
     pool = request.app.state.pool
+    
+    input_data = ChatInput(**json.loads(input_data))
     
     if f:
         return StreamingResponse(
@@ -38,31 +43,67 @@ async def stream_chat(request: Request, input_data: dict, f: Optional[UploadFile
             media_type="text/plain",
         )
 
-@router.post("/chat")
-async def chat(request: Request, input_data: dict, f: Optional[UploadFile] = File(None)):
+@router.post("/chat/{thread_id}")
+async def chat(
+    request: Request, 
+    thread_id: uuid.UUID, 
+    input_data: str = Form(...), 
+    f: Optional[UploadFile] = File(None),
+):
     pool = request.app.state.pool
     
+    input_data = ChatInput(**json.loads(input_data))
+    
     if f:
-        return chat(pool, input_data, f)
+        return await chat_workflow(pool, input_data, f)
     else:
-        return chat(pool, input_data)
-        
-@router.get("/get_graph")
+        return await chat_workflow(pool, input_data)
+  
+    
+@router.post("/add_member/add_company") #✅
+async def add_company(request: Request, tenant: str = Body(...)):
+    pool = request.app.state.pool
+
+    return await new_company(pool, tenant)
+    
+@router.post("/add_member/{tenant_id}/add_user/") #✅
+async def add_user(
+    request: Request, 
+    tenant_id: uuid.UUID, 
+    input_data: AddUserInput,
+):
+    pool = request.app.state.pool
+
+    user = input_data.user
+    role = input_data.role
+
+    return await new_user(pool, tenant_id, user, role)
+
+
+# Upload document (RAG)
+@router.post("/upload/{tenant_id}")
+async def upload(request: Request, tenant_id: uuid.UUID, f: UploadFile):
+    pool = request.app.state.pool
+    
+    return await put_new_knowledge(pool, f, tenant_id)
+
+
+@router.get("/get_graph") #✅
 async def get_graph():
     await get_agent_graph()
-    return {"success"}
+    return {"status": "success"}
+    
+
+@router.get("/health") #✅
+async def health(request: Request):
+    pool = request.app.state.pool
+    
+    return await health_check(pool)
 
 # Get Chat Session (and the history)
 
 # Get user_id from log in
 
 # Delete Chat Session
-
-# Upload document (RAG)
-@router.post("/upload")
-async def upload(request: Request, f: UploadFile, tenant_id: uuid.UUID):
-    pool = request.app.state.pool
-    
-    return await put_new_knowledge(pool, f, tenant_id)
 
 # Delete document (RAG)
