@@ -1,13 +1,13 @@
 from models.gemini import gemini, gemini_instruct, gemini_thinking_reasoning, gemini_embedding
 
-from langchain.tools import tool
+# from langchain.tools import tool
 from langgraph.graph import StateGraph, START, END
 from langchain_core.messages import ToolMessage, SystemMessage, AIMessage, HumanMessage
 from langchain_core.messages.utils import trim_messages
 from langchain_core.runnables import RunnableConfig
 from langgraph.types import Command
 from langgraph.prebuilt import InjectedState, ToolNode
-from langchain_core.tools import InjectedToolCallId
+from langchain_core.tools import InjectedToolCallId, tool
 from langchain_community.tools import DuckDuckGoSearchResults
 
 from typing_extensions import Annotated, Any
