@@ -2,7 +2,7 @@ from postgres.checkpoint.aio import AsyncPostgresSaver
 from langchain_core.messages import HumanMessage, message_to_dict
 from langchain_core.runnables import RunnableConfig
 
-import os, uuid
+import os, uuid, logging, traceback
 from models.gemini import gemini
 from utils.documents_utils import put_new_knowledge_session
 from fastapi import UploadFile
@@ -11,15 +11,20 @@ from dotenv import load_dotenv
 from typing_extensions import Optional
 from body_models.router_models import ChatInput
 
+import src.langgraph_core as lang_core
+
 load_dotenv()
 
 DB_URI = os.getenv("DATABASE_URL")
 pool = None 
 
+logger = logging.getLogger(__name__)
+
 async def streaming(db_pool, input_data: ChatInput, f: Optional[UploadFile] = None): 
     # use get_stream_writer: https://reference.langchain.com/python/langgraph/config/get_stream_writer
     global pool
     pool = db_pool
+    lang_core.pool = pool
     
     builder = await get_agent()
     
@@ -47,11 +52,35 @@ async def streaming(db_pool, input_data: ChatInput, f: Optional[UploadFile] = No
     else:
         result = None
     
-    async with AsyncPostgresSaver.from_conn_string(DB_URI) as checkpointer:
-        agent = builder.compile(checkpointer=checkpointer) # Don't forget use checkpointer
-        
-        if result is not None:
-            if result.get("metadata", None) is not None:
+    try:
+        async with AsyncPostgresSaver.from_conn_string(DB_URI) as checkpointer:
+            agent = builder.compile(checkpointer=checkpointer) # Don't forget use checkpointer
+            
+            if result is not None:
+                if result.get("metadata", None) is not None:
+                    async for chunk in agent.astream(
+                        {
+                            "tenant_id": tenant_id,
+                            "user_id": user_id,
+                            "thread_id": thread_id,
+                            "messages": [HumanMessage(content=input_prompt)],
+                            "mode": mode, 
+                            "streaming_mode": True,
+                            "retrieved_session_knowledge": [{result["s_knowledge_id"]: {"metadata": result["result"], "chunk_ids": result["chunk_ids"]}}],
+                        },
+                        config,
+                        stream_mode="custom",
+                        version="v2",
+                    ):
+                        if chunk["type"] == "messages":
+                            msg, metadata = chunk["data"]
+                            if msg.content:
+                                yield msg.content 
+                                    
+                else:
+                    yield result
+            
+            else:
                 async for chunk in agent.astream(
                     {
                         "tenant_id": tenant_id,
@@ -60,7 +89,6 @@ async def streaming(db_pool, input_data: ChatInput, f: Optional[UploadFile] = No
                         "messages": [HumanMessage(content=input_prompt)],
                         "mode": mode, 
                         "streaming_mode": True,
-                        "retrieved_session_knowledge": [{result["s_knowledge_id"]: {"metadata": result["result"], "chunk_ids": result["chunk_ids"]}}],
                     },
                     config,
                     stream_mode="custom",
@@ -70,40 +98,22 @@ async def streaming(db_pool, input_data: ChatInput, f: Optional[UploadFile] = No
                         msg, metadata = chunk["data"]
                         if msg.content:
                             yield msg.content 
-                                
-            else:
-                yield result
-        
-        else:
-            async for chunk in agent.astream(
-                {
-                    "tenant_id": tenant_id,
-                    "user_id": user_id,
-                    "thread_id": thread_id,
-                    "messages": [HumanMessage(content=input_prompt)],
-                    "mode": mode, 
-                    "streaming_mode": True,
-                },
-                config,
-                stream_mode="custom",
-                version="v2",
-            ):
-                if chunk["type"] == "messages":
-                    msg, metadata = chunk["data"]
-                    if msg.content:
-                        yield msg.content 
+    except Exception as e:
+        print(e)
+        yield {"status": "error", "content": str(e)}
 
 async def chat_workflow(db_pool, input_data: dict, f: Optional[UploadFile] = None):
     global pool
     pool = db_pool
+    lang_core.pool = pool
     
     builder = await get_agent()
     
-    thread_id = input_data["thread_id"]
-    user_id = input_data["user_id"]
-    tenant_id = input_data["tenant_id"]
-    input_prompt = input_data["input_prompt"]
-    mode = input_data["mode"]
+    thread_id = input_data.thread_id
+    user_id = input_data.user_id
+    tenant_id = input_data.tenant_id
+    input_prompt = input_data.input_prompt
+    mode = input_data.mode
     
     config: RunnableConfig = {
         "configurable": {
@@ -123,12 +133,32 @@ async def chat_workflow(db_pool, input_data: dict, f: Optional[UploadFile] = Non
     else:
         result = None
     
-    async with AsyncPostgresSaver.from_conn_string(DB_URI) as checkpointer:
-        agent = builder.compile(checkpointer=checkpointer) # Don't forget use checkpointer
-        
-        if result is not None:
-            if result.get("metadata", None) is not None:
-                result_agent = agent.ainvoke(
+    try:
+        async with AsyncPostgresSaver.from_conn_string(DB_URI) as checkpointer:
+            agent = builder.compile(checkpointer=checkpointer) # Don't forget use checkpointer
+            
+            if result is not None:
+                if result.get("metadata", None) is not None:
+                    result_agent = await agent.ainvoke(
+                        {
+                            "tenant_id": tenant_id,
+                            "user_id": user_id,
+                            "thread_id": thread_id,
+                            "messages": [HumanMessage(content=input_prompt)],
+                            "mode": mode, 
+                            "streaming_mode": False,
+                            "retrieved_session_knowledge": [{result["s_knowledge_id"]: {"metadata": result["result"], "chunk_ids": result["chunk_ids"]}}],
+                        },
+                        config,
+                    )
+                    
+                    return message_to_dict(result_agent["message"][-1])
+                        
+                else:
+                    return result
+                    
+            else:
+                result_agent = await agent.ainvoke(
                     {
                         "tenant_id": tenant_id,
                         "user_id": user_id,
@@ -136,30 +166,15 @@ async def chat_workflow(db_pool, input_data: dict, f: Optional[UploadFile] = Non
                         "messages": [HumanMessage(content=input_prompt)],
                         "mode": mode, 
                         "streaming_mode": False,
-                        "retrieved_session_knowledge": [{result["s_knowledge_id"]: {"metadata": result["result"], "chunk_ids": result["chunk_ids"]}}],
                     },
                     config,
                 )
                 
                 return message_to_dict(result_agent["message"][-1])
-                    
-            else:
-                return result
-                
-        else:
-            result_agent = agent.ainvoke(
-                {
-                    "tenant_id": tenant_id,
-                    "user_id": user_id,
-                    "thread_id": thread_id,
-                    "messages": [HumanMessage(content=input_prompt)],
-                    "mode": mode, 
-                    "streaming_mode": False,
-                },
-                config,
-            )
-            
-            return message_to_dict(result_agent["message"][-1])
+    except Exception as e:
+        logger.error(traceback.format_exc())
+        print(e)
+        return {"status": "error", "content": str(e)}
                 
 async def get_agent_graph():
     builder = await get_agent()

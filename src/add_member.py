@@ -1,14 +1,14 @@
 from utils.contextmanager_utils import supabase_client
-from string_utils.database_queries import AddQueries, TitleQueries
+from string_utils.database_queries import AddQueries
 from utils.documents_utils import encrypt, decrypt
 from string_utils.prompts import PromptTitle
 from utils.documents_utils import encrypt, decrypt
 from src.chat_completion import streaming, chat_workflow
+from models.gemini import gemini
 import os, uuid
 
 pool = None
 addqueries = AddQueries()
-titlequeries = TitleQueries()
 prompttitle = PromptTitle()
 
 async def new_company(db_pool, tenant: str):
@@ -55,9 +55,9 @@ async def new_chat(db_pool, input_data: dict):
     global pool
     pool = db_pool
     
-    user_id = input_data["user_id"]
-    tenant_id = input_data["tenant_id"]
-    input_prompt = input_data["input_prompt"]
+    user_id = input_data.user_id
+    tenant_id = input_data.tenant_id
+    input_prompt = input_data.input_prompt
     thread_id = uuid.uuid4()
 
     try:    
@@ -66,11 +66,11 @@ async def new_chat(db_pool, input_data: dict):
                 "input_prompt": input_prompt,
             })
             
-            title = gemini.ainvoke(SESSION_TITLE_SYSTEM_QUERY)
+            title = await gemini.ainvoke(SESSION_TITLE_SYSTEM_QUERY)
             encrypted_title = await encrypt(title)
             
             await conn.execute(
-                titlequeries.INSERT_SESSION_TITLE,
+                addqueries.INSERT_SESSION_TITLE,
                 thread_id, tenant_id, user_id, encrypted_title
             )                 
             

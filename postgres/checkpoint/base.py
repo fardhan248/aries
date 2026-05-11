@@ -43,21 +43,21 @@ select
     (
         select array_agg(array[bl.channel::bytea, bl.type::bytea, bl.blob])
         from jsonb_each_text(checkpoint -> 'channel_versions')
-        inner join Session_blobs bl
-            on bl.thread_id = Session_checkpoints.thread_id
-            and bl.checkpoint_ns = Session_checkpoints.checkpoint_ns
+        inner join "Session_blobs" bl
+            on bl.thread_id = "Session_checkpoints".thread_id
+            and bl.checkpoint_ns = "Session_checkpoints".checkpoint_ns
             and bl.channel = jsonb_each_text.key
             and bl.version = jsonb_each_text.value
     ) as channel_values,
     (
         select
         array_agg(array[cw.task_id::text::bytea, cw.channel::bytea, cw.type::bytea, cw.blob] order by cw.task_id, cw.idx)
-        from Session_checkpoint_writes cw
-        where cw.thread_id = Session_checkpoints.thread_id
-            and cw.checkpoint_ns = Session_checkpoints.checkpoint_ns
-            and cw.checkpoint_id = Session_checkpoints.checkpoint_id
+        from "Session_checkpoint_writes" cw
+        where cw.thread_id = "Session_checkpoints".thread_id
+            and cw.checkpoint_ns = "Session_checkpoints".checkpoint_ns
+            and cw.checkpoint_id = "Session_checkpoints".checkpoint_id
     ) as pending_writes
-from Session_checkpoints """
+from "Session_checkpoints" """
 
 SELECT_PENDING_SENDS_SQL = f"""
 select
@@ -65,7 +65,7 @@ select
     user_id,
     checkpoint_id,
     array_agg(array[type::bytea, blob] order by task_path, task_id, idx) as sends
-from Session_checkpoint_writes
+from "Session_checkpoint_writes"
 where thread_id = %s
     and checkpoint_id = any(%s)
     and channel = '{TASKS}'
@@ -73,13 +73,13 @@ group by checkpoint_id
 """
 
 UPSERT_CHECKPOINT_BLOBS_SQL = """
-    INSERT INTO Session_blobs (tenant_id, user_id, thread_id, checkpoint_ns, channel, version, type, checkpoint_blob)
+    INSERT INTO "Session_blobs" (tenant_id, user_id, thread_id, checkpoint_ns, channel, version, type, checkpoint_blob)
     VALUES (%s, %s, %s, %s, %s, %s, %s, %s)
     ON CONFLICT (thread_id, checkpoint_ns, channel, version) DO NOTHING
 """
 
 UPSERT_CHECKPOINTS_SQL = """
-    INSERT INTO Session_checkpoints (tenant_id, user_id, thread_id, checkpoint_ns, checkpoint_id, parent_checkpoint_id, checkpoint, metadata)
+    INSERT INTO "Session_checkpoints" (tenant_id, user_id, thread_id, checkpoint_ns, checkpoint_id, parent_checkpoint_id, checkpoint, metadata)
     VALUES (%s, %s, %s, %s, %s, %s, %s, %s)
     ON CONFLICT (thread_id, checkpoint_ns, checkpoint_id)
     DO UPDATE SET
@@ -88,7 +88,7 @@ UPSERT_CHECKPOINTS_SQL = """
 """
 
 UPSERT_CHECKPOINT_WRITES_SQL = """
-    INSERT INTO Session_checkpoint_writes (tenant_id, user_id, thread_id, checkpoint_ns, checkpoint_id, task_id, task_path, idx, channel, type, blob)
+    INSERT INTO "Session_checkpoint_writes" (tenant_id, user_id, thread_id, checkpoint_ns, checkpoint_id, task_id, task_path, idx, channel, type, blob)
     VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
     ON CONFLICT (thread_id, checkpoint_ns, checkpoint_id, task_id, idx) DO UPDATE SET
         channel = EXCLUDED.channel,
@@ -97,7 +97,7 @@ UPSERT_CHECKPOINT_WRITES_SQL = """
 """
 
 INSERT_CHECKPOINT_WRITES_SQL = """
-    INSERT INTO Session_checkpoint_writes (tenant_id, user_id, thread_id, checkpoint_ns, checkpoint_id, task_id, task_path, idx, channel, type, blob)
+    INSERT INTO "Session_checkpoint_writes" (tenant_id, user_id, thread_id, checkpoint_ns, checkpoint_id, task_id, task_path, idx, channel, type, blob)
     VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
     ON CONFLICT (thread_id, checkpoint_ns, checkpoint_id, task_id, idx) DO NOTHING
 """

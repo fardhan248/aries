@@ -38,7 +38,7 @@ def items_reducer(current: list, new: dict):
 class State(TypedDict):
     tenant_id: str
     user_id: str
-    session_id: str # thread_id
+    thread_id: str # thread_id
     mode: Literal["auto", "thinking", "fast"] = "auto" # auto, thinking (reasoning), fast (no reasoning)
     streaming_mode: bool = False
 

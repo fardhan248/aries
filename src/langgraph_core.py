@@ -24,6 +24,8 @@ from string_utils.prompts import Prompts
 queries = Queries()
 prompts = Prompts()
 
+pool = None
+
 # Tools
 ## Tool: Put new memory
 @tool
@@ -146,7 +148,7 @@ async def fetch_new_knowledge(
                 for result in result_knowledge:
                     knowledge_id = result["knowledge_id"]
                     metadata = result["metadata"]
-                    selected_knowledge_dict[knowledge_id]["metadata"] = decrypt(metadata)
+                    selected_knowledge_dict[knowledge_id]["metadata"] = await decrypt(metadata)
     
     except Exception as e:
         print(e)
@@ -766,7 +768,7 @@ async def rag(state: State, config: RunnableConfig):
         "knowledges": knowledges,
     })
     
-    llm_output = await gemini_instruct.ainvoke(SystemMessage(content=system_query))
+    llm_output = await gemini_instruct.ainvoke([SystemMessage(content=system_query)])
     vector = await gemini_embedding.aembed_query(llm_output.content)
     
     # Retrieve from database 
@@ -859,7 +861,7 @@ async def router(state: State): # Tambahkan fungsi atau state untuk format outpu
             "latest_message": trimmed_msg[-1],
         })
         
-    response = router_model.ainvoke(SystemMessage(content=system_query))
+    response = await router_model.ainvoke([SystemMessage(content=system_query)])
     
     if response["route"] == "coding_react" or response["route"] == "thinking_react":
         return Command(
@@ -943,7 +945,7 @@ async def coding_basic(state: State):
     if state["streaming_mode"] == True:
         pass
     else:
-        response = gemini_instruct_tools.ainvoke(final_query)
+        response = await gemini_instruct_tools.ainvoke(final_query)
     
     return {"messages": response}
     
@@ -993,11 +995,11 @@ async def coding_react(state: State):
             "history": trimmed_msg[:-1],
         })    
     
-    result = await gemini_thinking_reasoning_tools.ainvoke(SystemMessage(content=system_prompt))
+    result = await gemini_thinking_reasoning_tools.ainvoke([SystemMessage(content=system_prompt)])
     
     if result.tool_calls:
         return {
-            "messages": [AIMessage(content=f"Observation with tools: {extract_content(result)}")],
+            "messages": [AIMessage(content=f"Observation with tools: {await extract_content(result)}")],
             "last_query": msg,
         }
     else:
@@ -1091,11 +1093,11 @@ async def thinking_react(state: State):
             "history": trimmed_msg[:-1],
         })
     
-    result = await gemini_thinking_reasoning_tools.ainvoke(SystemMessage(content=system_prompt))
+    result = await gemini_thinking_reasoning_tools.ainvoke([SystemMessage(content=system_prompt)])
     
     if result.tool_calls:
         return {
-            "messages": [AIMessage(content=f"Observation with tools: {extract_content(result)}")],
+            "messages": [AIMessage(content=f"Observation with tools: {await extract_content(result)}")],
             "last_query": msg,
         }
     else:
@@ -1191,7 +1193,7 @@ async def reasoning(state: State):
         "iteration": iteration,
     })   
     
-    decision = gemini_thinking_reasoning.ainvoke(SystemMessage(content=prompt))
+    decision = await gemini_thinking_reasoning.ainvoke([SystemMessage(content=prompt)])
     
     if decision.content[0]["text"].startswith("QUERY:"):
         return Command(

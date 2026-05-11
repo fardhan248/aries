@@ -41,7 +41,7 @@ async def make_new_chat(
             size=f.size,
         )
         
-        return chat(
+        return await chat(
                 request=request,
                 thread_id=input_data.thread_id,
                 input_data=input_data.model_dump_json(),
@@ -55,17 +55,21 @@ async def make_new_chat(
        
     input_data.thread_id = result["thread_id"]
     
-    file_content = await f.read()
-    f2 = UploadFile(
-        filename=f.filename,
-        file=io.BytesIO(file_content),
-        headers=Headers({"content_type": f.content_type}),
-        size=f.size,
-    )
-    
-    return chat(
+    if f is not None:
+        file_content = await f.read()
+        f2 = UploadFile(
+            filename=f.filename,
+            file=io.BytesIO(file_content),
+            headers=Headers({"content_type": f.content_type}),
+            size=f.size,
+        )
+    else:   
+        f2=f
+     
+        
+    return await chat(
             request=request,
-            thread_id=thread_id,
+            thread_id=input_data.thread_id,
             input_data=input_data.model_dump_json(),
             f=f2,
         )
@@ -118,6 +122,9 @@ async def chat(
     
     input_data = ChatInput(**json.loads(input_data))
     streaming = input_data.streaming
+    
+    if input_data.thread_id is None and thread_id is not None:
+        input_data.thread_id = thread_id
     
     if streaming == False:
         if f:

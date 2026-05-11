@@ -141,23 +141,6 @@ class DocumentQueries:
     INSERT INTO "Knowledge_vectors" (chunk_id, knowledge_id, tenant_id, content, embedding)
     VALUES ($1, $2, $3, $4, $5)
     """
-
-# ====================
-# chat_completion.py
-    
-class TitleQueries:
-    ## === Function: new_chat
-    
-    FETCH_SESSION_TITLE = """
-    SELECT thread_id, title
-    FROM "Sessions"
-    WHERE thread_id = $1;
-    """
-    
-    INSERT_SESSION_TITLE = """
-    INSERT INTO "Sessions" (thread_id, tenant_id, user_id, title)
-    VALUES ($1, $2, $3)
-    """
     
 # ====================
 # add_member.py
@@ -174,5 +157,18 @@ class AddQueries:
     
     INSERT_NEW_USER = """
     INSERT INTO "Users" (user_id, tenant_id, role, name)
+    VALUES ($1, $2, $3, $4)
+    """
+    
+    ## === Function: new_chat
+    
+    FETCH_SESSION_TITLE = """
+    SELECT thread_id, title
+    FROM "Sessions"
+    WHERE thread_id = $1;
+    """
+    
+    INSERT_SESSION_TITLE = """
+    INSERT INTO "Sessions" (thread_id, tenant_id, user_id, title)
     VALUES ($1, $2, $3, $4)
     """
