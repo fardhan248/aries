@@ -81,7 +81,7 @@ async def add_user(
 
 
 # Upload document (RAG)
-@router.post("/upload/{tenant_id}")
+@router.post("/upload/{tenant_id}") #✅
 async def upload(request: Request, tenant_id: uuid.UUID, f: UploadFile):
     pool = request.app.state.pool
     

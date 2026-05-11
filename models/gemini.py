@@ -38,7 +38,7 @@ gemini_thinking_reasoning = ChatGoogleGenerativeAI(
 )
 
 gemini_embedding = GoogleGenerativeAIEmbeddings(
-    model="gemini-embedding-2",
+    model="gemini-embedding-001",
     google_api_key=google_api_key,
 )
 

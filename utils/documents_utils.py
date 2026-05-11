@@ -154,15 +154,10 @@ async def save_chunks_to_db(pool, chunks, pages, f, tenant_id):
     }
 
     vector = await gemini_embedding.aembed_documents(chunks)
-    print("len_vector:", len(vector), ", len_chunks:", len(chunks))
-    print("type_vector:", type(vector), ", type_chunks:", type(chunks))
-    print("len vector 0", len(vector[0]))
-    # print(chunks[0])
     
     encrypted_chunks = await asyncio.gather(
         *(encrypt(chunk) for chunk in chunks)
     )
-    print("encrypted_chunks:", len(encrypted_chunks))
     
     encrypted_metadata = await encrypt(metadata)
 
@@ -172,7 +167,6 @@ async def save_chunks_to_db(pool, chunks, pages, f, tenant_id):
     ] 
     
     chunk_ids = [r[0] for r in records]
-    print(chunk_ids)
     
     try:
         async with pool.acquire() as conn:
