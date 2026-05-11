@@ -39,9 +39,8 @@ class State(TypedDict):
     tenant_id: str
     user_id: str
     session_id: str # thread_id
-    title: str
     mode: Literal["auto", "thinking", "fast"] = "auto" # auto, thinking (reasoning), fast (no reasoning)
-    streaming_mode: bool = True
+    streaming_mode: bool = False
 
     messages: Annotated[list[AnyMessage], operator.add] = [] # list of AnyMessage, Human, AI, Tool, System
     selected_knowledge: Annotated[list[dict], items_reducer] = [] # list of dict: [{knowledge_id: {"metadata": metadata, "chunk_ids": [id_1, id_2]}}]
