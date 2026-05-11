@@ -86,7 +86,7 @@ class Prompts:
     History messages:
     {trimmed_msg_fast}
     Latest message:
-    {latest_message]}
+    {latest_message}
 
     mode:
     {format_mode}

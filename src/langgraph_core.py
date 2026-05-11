@@ -6,7 +6,7 @@ from langchain_core.messages import ToolMessage, SystemMessage, AIMessage, Human
 from langchain_core.messages.utils import trim_messages
 from langchain_core.runnables import RunnableConfig
 from langgraph.types import Command
-from langgraph.prebuilt import InjectedState 
+from langgraph.prebuilt import InjectedState, ToolNode
 from langchain_core.tools import InjectedToolCallId
 from langchain_community.tools import DuckDuckGoSearchResults
 
@@ -29,10 +29,10 @@ pool = None
 # Tools
 ## Tool: Put new memory
 @tool
-async def put_new_memory(
-    query: str, 
+async def put_new_memory( 
     state: Annotated[State, InjectedState],
     tool_call_id: Annotated[str, InjectedToolCallId],
+    query: str,
 ) -> str | Command: # return: success put new user memory to the database
     """
     Store a new memory entry for the user into the database.
@@ -95,9 +95,9 @@ async def put_new_memory(
 ## Tool: Fetch new knowledge (yang gak ada di state["selected_knowledge"]) 
 @tool
 async def fetch_new_knowledge(
-    query: str, 
     state: Annotated[State, InjectedState],
     tool_call_id: Annotated[str, InjectedToolCallId],
+    query: str, 
 ) -> Command | str:
     """
     Fetch new knowledge chunks from the database that are not yet in the current state.
@@ -178,10 +178,10 @@ async def fetch_new_knowledge(
 
 ## Tool: Fetch new memory (yang gak ada di state["memory_ids"])
 @tool
-async def fetch_new_memory(
-    query: str, 
+async def fetch_new_memory( 
     state: Annotated[State, InjectedState],
     tool_call_id: Annotated[str, InjectedToolCallId],
+    query: str,
 ) -> Command | str:
     """
     Fetch new memory entries for the user from the database that are not yet in the current state.
@@ -241,9 +241,9 @@ async def fetch_new_memory(
 ## Tool: Fetch new knowledge_session (yang gak ada di state["retrieved_session_knowledge"])
 @tool
 async def fetch_new_knowledge_session(
-    query: str, 
     state: Annotated[State, InjectedState],
     tool_call_id: Annotated[str, InjectedToolCallId],
+    query: str, 
 ) -> Command | str:
     """
     Fetch new session knowledge chunks from the database that are not yet in the current state.
@@ -471,6 +471,8 @@ gemini_thinking_reasoning_tools = gemini_thinking_reasoning.bind_tools(tools)
 
 tools_by_name = {tool.name: tool for tool in tools}
 
+tool_node = ToolNode(tools)
+
 async def call_tools(state: State):
     outputs = []
     for tool_call in state["messages"][-1].tool_calls:
@@ -486,18 +488,52 @@ async def call_tools(state: State):
             )
     return {"messages": outputs}
     
-async def should_continue(state: State):
+async def basic_should_continue(state: State):
+    print("Should continue?")
     messages = state["messages"]
-    mode = state["mode"]
-
-    if not messages[-1].tool_calls:
-        if mode == "thinking":
-            return "reasoning"
+    
+    tool_calls = getattr(messages[-1], "tool_calls", [])
+    print(tool_calls)
+    if len(tool_calls) == 0:
         print("END")
         return END #state["route"] # basic or coding_basic
         
-    return "call_tools"
+    print(messages)
+    return "basic_tools"
+    
+async def coding_basic_should_continue(state: State):
+    print("Should continue?")
+    messages = state["messages"]
 
+    tool_calls = getattr(messages[-1], "tool_calls", [])
+
+    if len(tool_calls) == 0:
+        print("END")
+        return END 
+        
+    return "coding_tools"
+    
+async def coding_react_should_continue(state: State):
+    print("Should continue?")
+    messages = state["messages"]
+
+    tool_calls = getattr(messages[-1], "tool_calls", [])
+
+    if len(tool_calls) == 0:
+        return "reasoning"
+        
+    return "coding_react_tools"
+
+async def thinking_react_should_continue(state: State):
+    print("Should continue?")
+    messages = state["messages"]
+    
+    tool_calls = getattr(messages[-1], "tool_calls", [])
+
+    if len(tool_calls) == 0:
+        return "reasoning"
+
+    return "thinking_react_tools"
 
 # Agents
 ## Fetch history messages (dari checkpointer)
@@ -886,7 +922,7 @@ async def router(state: State): # Tambahkan fungsi atau state untuk format outpu
         
     else: # fast
         print("fast mode")
-        system_query = prompts.FAST_SYSTEM_QUERY({
+        system_query = prompts.FAST_SYSTEM_QUERY.format_map({
             "trimmed_msg_fast": trimmed_msg[:-1],
             "latest_message": trimmed_msg[-1],
             "format_mode": state["mode"],
@@ -931,7 +967,7 @@ async def basic(state: State):
     knowledges = [{"chunk": chunk, "metadata": metadata_knowledge[k_id]} for x in state["chunk_knowledge"] for chunk, k_id in [x.values()]]
     s_knowledges = [{"chunk": chunk, "metadata": metadata_s_knowledge[k_id]} for x in state["chunk_retrieved_session_knowledge"] for chunk, k_id in [x.values()]]
     
-    memories = [val for x in state["memory"] for _, val in x]
+    memories = [val for x in state["memory"] for _, val in x.items()]
     
     system_query = prompts.BASIC_SYSTEM_QUERY.format_map({
         "knowledges": knowledges,
@@ -1038,9 +1074,10 @@ async def coding_react(state: State):
     result = await gemini_thinking_reasoning_tools.ainvoke([HumanMessage(content=system_prompt)])
     
     if result.tool_calls:
-        extracted_content = await extract_content(result)
+        # extracted_content = await extract_content(result)
         return {
-            "messages": [AIMessage(content=f"Observation with tools: {extracted_content}")],
+            # "messages": [AIMessage(content=f"Observation with tools: {extracted_content}")],
+            "messages": [result],
             "last_query": msg,
         }
     else:
@@ -1142,8 +1179,10 @@ async def thinking_react(state: State):
     result = await gemini_thinking_reasoning_tools.ainvoke([HumanMessage(content=system_prompt)])
     
     if result.tool_calls:
+        # extracted_content = await extract_content(result)
         return {
-            "messages": [AIMessage(content=f"Observation with tools: {await extract_content(result)}")],
+            # "messages": [AIMessage(content=f"Observation with tools: {extract_content}")],
+            "messages": [result],
             "last_query": msg,
         }
     else:
@@ -1285,7 +1324,10 @@ async def get_agent():
     builder.add_node("thinking_react", thinking_react)
     builder.add_node("thinking_end", thinking_end)
     builder.add_node("reasoning", reasoning)
-    builder.add_node("call_tools", call_tools)
+    builder.add_node("basic_tools", tool_node) #call_tools)
+    builder.add_node("coding_basic_tools", tool_node)
+    builder.add_node("coding_react_tools", tool_node)
+    builder.add_node("thinking_react_tools", tool_node)
     
     
     builder.add_edge(START, "check_knowledge_session_ttl")
@@ -1316,11 +1358,11 @@ async def get_agent():
     # builder.add_conditional_edges("router", lambda s: s["route"], ["basic", "coding_basic", "reasoning"])
     
     # non-reasoning (basic and coding)
-    builder.add_conditional_edges("basic", should_continue, ["call_tools", END])
-    builder.add_edge("call_tools", "basic")
+    builder.add_conditional_edges("basic", basic_should_continue, ["basic_tools", END])
+    builder.add_edge("basic_tools", "basic")
     
-    builder.add_conditional_edges("coding_basic", should_continue, ["call_tools", END])
-    builder.add_edge("call_tools", "coding_basic")
+    builder.add_conditional_edges("coding_basic", coding_basic_should_continue, ["coding_basic_tools", END])
+    builder.add_edge("coding_basic_tools", "coding_basic")
     
     # thinking-reasoning (coding and thinking)
     # builder.add_edge("reasoning", "coding_react")
@@ -1329,12 +1371,12 @@ async def get_agent():
     # builder.add_edge("reasoning", "thinking_end")
     # builder.add_conditional_edges("reasoning", lambda s: s["route"], ["coding_react", "coding_end", "thinking_react", "thinking_end"])
     ## coding
-    builder.add_conditional_edges("coding_react", should_continue, ["call_tools", "reasoning"])
-    builder.add_edge("call_tools", "coding_react")
+    builder.add_conditional_edges("coding_react", coding_react_should_continue, ["coding_react_tools", "reasoning"])
+    builder.add_edge("coding_react_tools", "coding_react")
     builder.add_edge("coding_end", END)
     ## thinking
-    builder.add_conditional_edges("thinking_react", should_continue, ["call_tools", "reasoning"])
-    builder.add_edge("call_tools", "thinking_react")
+    builder.add_conditional_edges("thinking_react", thinking_react_should_continue, ["thinking_react_tools", "reasoning"])
+    builder.add_edge("thinking_react_tools", "thinking_react")
     builder.add_edge("thinking_end", END)
     
     return builder

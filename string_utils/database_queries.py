@@ -121,13 +121,13 @@ class DocumentQueries:
     ## === Function: save_chunks_session_to_db
     
     INPUT_SESSION_KNOWLEDGES = """
-    INSERT INTO "Session_nowledges" (s_knowledge_id, tenant_id, user_id, metadata)
-    VALUES ($1, $2, $3, $4)
+    INSERT INTO "Session_knowledges" (s_knowledge_id, tenant_id, user_id, thread_id, metadata)
+    VALUES ($1, $2, $3, $4, $5)
     """
 
     INPUT_SESSION_KNOWLEDGE_CHUNKS = """
-    INSERT INTO "Session_vectors" (chunk_id, s_knowledge_id, tenant_id, user_id, content, embedding)
-    VALUES ($1, $2, $3, $4, $5, $6)
+    INSERT INTO "Session_vectors" (chunk_id, s_knowledge_id, tenant_id, user_id, thread_id, content, embedding)
+    VALUES ($1, $2, $3, $4, $5, $6, $7)
     """
 
     ## === Function: save_chunks_to_db

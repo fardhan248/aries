@@ -30,15 +30,22 @@ async def decrypt(data: bytes) -> str:
     
     return plaintext.decode()
  
-async def chunk_document(f, file_bytes):
+async def chunk_document(content_type, file_bytes):
+    if content_type not in ("application/pdf", "application/epub+zip", "text/plain"):
+        if file_bytes[:4] == b"%PDF":
+            content_type = "application/pdf"
+        elif file_bytes[:2] == b"PK":
+            content_type = "application/epub+zip"
+        else:
+            content_type = "text/plain"
+    
     filetype_map = {
         "application/pdf": "pdf",
         "application/epub+zip": "epub",
-        "text/plain": "txt",
     }
     
-    if f.content_type == "application/pdf" or f.content_type == "application/epub+zip":
-        filetype = filetype_map.get(f.content_type, "pdf")
+    if content_type == "application/pdf" or content_type == "application/epub+zip":
+        filetype = filetype_map.get(content_type, "pdf")
         doc = fitz.open(stream=file_bytes, filetype=filetype)
         len_doc = len(doc)
         
@@ -48,8 +55,11 @@ async def chunk_document(f, file_bytes):
         doc.close()
         
     else: # txt
-        doc = [1]
-        text = file_bytes.decode("utf-8")
+        len_doc = 1
+        try:
+            text = file_bytes.decode("utf-8")
+        except UnicodeDecodeError:
+            text = file_bytes.decode("latin-1")
         
     splitter = RecursiveCharacterTextSplitter(
         chunk_size=500,
@@ -59,7 +69,7 @@ async def chunk_document(f, file_bytes):
     return splitter.split_text(text), len_doc
  
 ## Upload user_document per chat, add TTL
-async def save_chunks_session_to_db(pool, chunks, pages, f, configurable, prompt):
+async def save_chunks_session_to_db(pool, chunks, pages, filename, content_type, configurable, prompt):
     def to_uuid(value: str | uuid.UUID) -> uuid.UUID:
         return value if isinstance(value, uuid.UUID) else uuid.UUID(value)
     
@@ -68,8 +78,6 @@ async def save_chunks_session_to_db(pool, chunks, pages, f, configurable, prompt
     thread_id = to_uuid(configurable["thread_id"])
     
     s_knowledge_id = uuid.uuid4()
-    filename = f.filename
-    content_type = f.content_type
     
     metadata = {
         "filename": filename,
@@ -86,17 +94,17 @@ async def save_chunks_session_to_db(pool, chunks, pages, f, configurable, prompt
     encrypt_metadata = await encrypt(metadata)
 
     records = [
-        (uuid.uuid4(), s_knowledge_id, tenant_id, user_id, chunk, vec)
+        (uuid.uuid4(), s_knowledge_id, tenant_id, user_id, thread_id, chunk, vec)
         for chunk, vec in zip(encrypted_chunks, vector)
     ]
     
-    chunk_ids = [r[0] for r in records]
+    chunk_ids = [str(r[0]) for r in records]
     
     try:
         async with pool.acquire() as conn:
             await conn.execute(
                 queries.INPUT_SESSION_KNOWLEDGES,
-                s_knowledge_id, tenant_id, user_id, encrypt_metadata
+                s_knowledge_id, tenant_id, user_id, thread_id, encrypt_metadata
             )
             
             await conn.executemany(
@@ -106,48 +114,49 @@ async def save_chunks_session_to_db(pool, chunks, pages, f, configurable, prompt
 
     except Exception as e:
         print(e)
-        return {"status": "error", "s_knowledge_id": 0, "user_id": 0}
+        return {"status": "error", "s_knowledge_id": 0, "user_id": 0, "content": str(e)}
         
-    return {"status": "success", "s_knowledge_id": s_knowledge_id, "user_id": user_id, "metadata": metadata, "chunk_ids": chunk_ids}
+    return {"status": "success", "s_knowledge_id": str(s_knowledge_id), "user_id": user_id, "metadata": metadata, "chunk_ids": chunk_ids}
 
 async def put_new_knowledge_session(pool, f, config, prompt):
+    filename = f.filename
+    content_type = f.content_type
     file_bytes = await f.read()
-    
+    print("content_type", content_type, filename)
     configurable = config["configurable"]
     user_id = configurable["user_id"]
+    thread_id = configurable["thread_id"]
     
     # Upload file to storage
     try:
         response = await (
             cm.supabase_client.storage.from_("knowledge_session").upload(
                 file=file_bytes,
-                path=f"{str(user_id)}/{f.filename}",
+                path=f"{str(thread_id)}/{filename}",
                 file_options={
-                    "content-type": f.content_type,
+                    "content-type": content_type,
                     "upsert": "false"
                 }
             )
         )
         
         # Chunking document
-        chunks, pages = await chunk_document(f, file_bytes)
+        chunks, pages = await chunk_document(content_type, file_bytes)
         
-        result = await save_chunks_session_to_db(pool, chunks, pages, f, configurable, prompt)
+        result = await save_chunks_session_to_db(pool, chunks, pages, filename, content_type, configurable, prompt)
         
         return result
 
     except Exception as e:
         print(e)
-        return {"status": "double", "s_knowledge_id": 0, "user_id": 0}
+        return {"status": "double", "s_knowledge_id": 0, "user_id": 0, "content": str(e)}
 
 ## Tool: Put new knowledge (by tenant admin)
-async def save_chunks_to_db(pool, chunks, pages, f, tenant_id):
+async def save_chunks_to_db(pool, chunks, pages, filename, content_type, tenant_id):
     if not isinstance(tenant_id, uuid.UUID):
         tenant_id = uuid.UUID(tenant_id)
     
     knowledge_id = uuid.uuid4()
-    filename = f.filename
-    content_type = f.content_type
     
     metadata = {
         "filename": filename,
@@ -168,7 +177,7 @@ async def save_chunks_to_db(pool, chunks, pages, f, tenant_id):
         for chunk, vec in zip(encrypted_chunks, vector)
     ] 
     
-    chunk_ids = [r[0] for r in records]
+    chunk_ids = [str(r[0]) for r in records]
     
     try:
         async with pool.acquire() as conn:
@@ -184,36 +193,38 @@ async def save_chunks_to_db(pool, chunks, pages, f, tenant_id):
 
     except Exception as e:
         print(e)
-        return {"status": "error", "knowledge_id": 0, "tenant_id": 0}
+        return {"status": "error", "knowledge_id": 0, "tenant_id": 0, "content": str(e)}
         
-    return {"status": "success", "knowledge_id": knowledge_id, "tenant_id": tenant_id, "metadata": metadata, "chunk_ids": chunk_ids}
+    return {"status": "success", "knowledge_id": str(knowledge_id), "tenant_id": tenant_id, "metadata": metadata, "chunk_ids": chunk_ids}
 
 async def put_new_knowledge(db_pool, f, tenant_id):
     global pool
     pool = db_pool
     
+    filename = f.filename
+    content_type = f.content_type
     file_bytes = await f.read()
-    
+    print("content_type", content_type, filename)
     # Upload file to storage
     try:
         response = await (
             cm.supabase_client.storage.from_("knowledges").upload(
                 file=file_bytes,
-                path=f"{str(tenant_id)}/{f.filename}",
+                path=f"{str(tenant_id)}/{filename}",
                 file_options={
-                    "content-type": f.content_type,
+                    "content-type": content_type,
                     "upsert": "false"
                 }
             )
         )
         
         # Chunking document
-        chunks, pages = await chunk_document(f, file_bytes)
+        chunks, pages = await chunk_document(filename, content_type, file_bytes)
         
-        result = await save_chunks_to_db(pool, chunks, pages, f, tenant_id)
+        result = await save_chunks_to_db(pool, chunks, pages, filename, content_type, tenant_id)
       
         return result
     
     except Exception as e:
         print(e)
-        return {"status": "double", "s_knowledge_id": 0, "user_id": 0}
+        return {"status": "double", "s_knowledge_id": 0, "user_id": 0, "content": str(e)}

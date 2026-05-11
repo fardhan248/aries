@@ -290,7 +290,7 @@ class AsyncPostgresSaver(BasePostgresSaver):
                 pass
             elif isinstance(v, (str, int, float, bool)):
                 pass
-            elif k in ["chunk_knowledge", "chunk_retrieved_session_knowledge", "memory", "reasoning_questions_observation"]:
+            elif k in ["chunk_knowledge", "chunk_retrieved_session_knowledge", "memory", "reasoning_questions_observation", "mode", "last_query", "iteration", "route"]:
                 del copy["channel_values"][k]
             else:
                 if k in ["selected_knowledge", "retrieved_session_knowledge", "memory_ids", "messages"]:

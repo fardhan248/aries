@@ -67,7 +67,9 @@ async def streaming(db_pool, input_data: ChatInput, f: Optional[UploadFile] = No
                             "messages": [HumanMessage(content=input_prompt)],
                             "mode": mode, 
                             "streaming_mode": True,
-                            "retrieved_session_knowledge": [{result["s_knowledge_id"]: {"metadata": result["result"], "chunk_ids": result["chunk_ids"]}}],
+                            "retrieved_session_knowledge": {
+                                "append": [{result["s_knowledge_id"]: {"metadata": result["metadata"], "chunk_ids": result["chunk_ids"]}}],
+                            },
                         },
                         config,
                         stream_mode="custom",
@@ -132,6 +134,7 @@ async def chat_workflow(db_pool, input_data: dict, f: Optional[UploadFile] = Non
             print("Success store new document")
         else:
             print("Error while store new document")
+            return {"status": "error", "content": result["content"]}
     else:
         result = None
     
@@ -149,12 +152,20 @@ async def chat_workflow(db_pool, input_data: dict, f: Optional[UploadFile] = Non
                             "messages": [HumanMessage(content=input_prompt)],
                             "mode": mode, 
                             "streaming_mode": False,
-                            "retrieved_session_knowledge": [{result["s_knowledge_id"]: {"metadata": result["result"], "chunk_ids": result["chunk_ids"]}}],
+                            "retrieved_session_knowledge": {
+                                "append": [{result["s_knowledge_id"]: {"metadata": result["metadata"], "chunk_ids": result["chunk_ids"]}}],
+                            },
                         },
                         config,
                     )
                     
-                    return message_to_dict(result_agent["message"][-1])
+                    try:
+                        text = message_to_dict(result_agent["messages"][-1])["data"]["content"][0]["text"]
+                    except Exception as e:
+                        print(e)
+                        text = message_to_dict(result_agent["messages"][-1])
+                    
+                    return {"thread_id": str(thread_id), "content": text}
                         
                 else:
                     return result
@@ -172,7 +183,11 @@ async def chat_workflow(db_pool, input_data: dict, f: Optional[UploadFile] = Non
                     config,
                 )
                 
-                text = message_to_dict(result_agent["messages"][-1])["data"]["content"][0]["text"]
+                try:
+                    text = message_to_dict(result_agent["messages"][-1])["data"]["content"][0]["text"]
+                except Exception as e:
+                    print(e)
+                    text = message_to_dict(result_agent["messages"][-1])
 
                 return {"thread_id": str(thread_id), "content": text}
     except Exception as e:

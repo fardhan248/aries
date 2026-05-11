@@ -110,7 +110,7 @@ async def chat(
     f: Optional[UploadFile] = File(None),
 ):
     pool = request.app.state.pool
-    print(f)
+
     input_data = ChatInput(**json.loads(input_data))
     streaming = input_data.streaming
     
@@ -119,14 +119,14 @@ async def chat(
     
     if streaming == False:
         if f:
-            return await chat_workflow(pool, input_data, f2)
+            return await chat_workflow(pool, input_data, f)
         else:
             return await chat_workflow(pool, input_data)
     
     else:
         if f:
             return StreamingResponse(
-                streaming(pool, input_data, f2), 
+                streaming(pool, input_data, f), 
                 media_type="text/plain",
             )
         else:
