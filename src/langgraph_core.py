@@ -48,6 +48,7 @@ async def put_new_memory(
         Command: Updates memory_ids and memory state on success.
         str: Success or failure message.
     """
+    print("Tool: put_new_memory")
     vector = await gemini_embedding.aembed_documents(query)
     user_id = uuid.UUID(state["user_id"])
     tenant_id = uuid.UUID(state["tenant_id"])
@@ -112,6 +113,7 @@ async def fetch_new_knowledge(
         Command: Updates selected_knowledge and chunk_knowledge state on success.
         str: Error message on failure.
     """
+    print("Tool: fetch_new_knowledge")
     tenant_id = uuid.UUID(state["tenant_id"])
     chunk_ids = [c_id for k in state["selected_knowledge"] for k_id in k for c_id in k[k_id]["chunk_ids"]]  
     chunk_ids = [uuid.UUID(c_id) for c_id in chunk_ids]
@@ -195,6 +197,7 @@ async def fetch_new_memory(
         Command: Updates memory and memory_ids state on success.
         str: Error message on failure.
     """
+    print("Tool: fetch_new_memory")
     user_id = uuid.UUID(state["user_id"])
     tenant_id = uuid.UUID(state["tenant_id"])
 
@@ -257,6 +260,7 @@ async def fetch_new_knowledge_session(
         Command: Updates retrieved_session_knowledge and chunk_retrieved_session_knowledge state on success.
         str: Error message on failure.
     """
+    print("Tool: fetch_knowledge_session")
     tenant_id = uuid.UUID(state["tenant_id"])
     user_id = uuid.UUID(state["user_id"])
     thread_id = uuid.UUID(state["thread_id"])
@@ -368,6 +372,7 @@ async def calculator(expression: CalculatorExpression) -> str:
     Returns:
         str: The result of the expression, or an error message if evaluation fails.
     """
+    print("Tool: calculator")
     try:
         expr = expression.expr.format_map(expression.variables)
         result = numexpr.evaluate(expr)
@@ -397,6 +402,7 @@ async def web_search(query: str) -> list[dict[str, str]]:
             - "title"  : title of the page.
             - "link"   : URL of the page.
     """
+    print("Tool: web_search")
     return await search.ainvoke(query)
     
     
@@ -449,6 +455,7 @@ async def get_datetime_now() -> str:
         str: Current datetime string in the format:
              "Year-Month-Date Hour:Minute:Second: YYYY-MM-DD HH:MM:SS.ffffff+HH:MM"
     """
+    print("Tool: get_datetime_now")
     return "Year-Month-Date Hour:Minute:Second: " + str(datetime.now(ZoneInfo("Asia/Jakarta")))
 
 ## Define Tools node
@@ -486,6 +493,7 @@ async def should_continue(state: State):
     if not messages[-1].tool_calls:
         if mode == "thinking":
             return "reasoning"
+        print("END")
         return END #state["route"] # basic or coding_basic
         
     return "call_tools"
@@ -554,6 +562,7 @@ async def fetch_knowledge_session(state: State, config: RunnableConfig):
     """
     Fetch knowledge session from existing retrieved_session_knowledge indexes.
     """    
+    print("Node: fetch_knowledge_session")
     # Load chunk_retrieved_session_knowledge
     tenant_id = uuid.UUID(state["tenant_id"])
     user_id = uuid.UUID(state["user_id"])
@@ -633,6 +642,7 @@ async def fetch_knowledge(state: State):
     """
     Fetch knowledge from existing selected_knowledge indexes.
     """
+    print("Node: fetch_knowledge")
     # Load chunk_knowledge
     tenant_id = uuid.UUID(state["tenant_id"])
     chunk_ids = [c_id for k in state["selected_knowledge"] for k_id in k for c_id in k[k_id]["chunk_ids"]]
@@ -929,6 +939,7 @@ async def basic(state: State):
     else:
         response = await gemini_instruct_tools.ainvoke(final_query)
     
+    print("Berhasil lewat basic")
     return {"messages": [response]}
 
 ## Agent: Coding basic

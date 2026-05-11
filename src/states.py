@@ -1,4 +1,4 @@
-from langchain.messages import AnyMessage
+from langchain_core.messages import BaseMessage
 
 import copy, operator, uuid
 from typing_extensions import TypedDict, Annotated, Literal, Any
@@ -42,7 +42,7 @@ class State(TypedDict):
     mode: Literal["auto", "thinking", "fast"] = "auto" # auto, thinking (reasoning), fast (no reasoning)
     streaming_mode: bool = False
 
-    messages: Annotated[list[AnyMessage], operator.add] = [] # list of AnyMessage, Human, AI, Tool, System
+    messages: Annotated[list[BaseMessage], operator.add] = [] # list of AnyMessage, Human, AI, Tool, System
     selected_knowledge: Annotated[list[dict], items_reducer] = [] # list of dict: [{knowledge_id: {"metadata": metadata, "chunk_ids": [id_1, id_2]}}]
     chunk_knowledge: Annotated[list[dict], items_reducer] = [] # list of dict: [{chunk_id: content, "knowledge_id": knowledge_id}]
     retrieved_session_knowledge: Annotated[list[dict], items_reducer] = [] # list of dict: [{s_knowledge_id: {"metadata": metadata, "chunk_ids": [id_1, id_2]}}]

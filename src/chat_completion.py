@@ -170,7 +170,9 @@ async def chat_workflow(db_pool, input_data: dict, f: Optional[UploadFile] = Non
                     config,
                 )
                 
-                return message_to_dict(result_agent["message"][-1])
+                text = message_to_dict(result_agent["messages"][-1])["data"]["content"][0]["text"]
+
+                return {"thread_id": str(thread_id), "content": text}
     except Exception as e:
         logger.error(traceback.format_exc())
         print(e)
