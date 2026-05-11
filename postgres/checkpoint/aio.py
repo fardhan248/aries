@@ -145,7 +145,7 @@ class AsyncPostgresSaver(BasePostgresSaver):
         Yields:
             An asynchronous iterator of matching checkpoint tuples.
         """
-        print("MASUK ALIST")
+        # print("MASUK ALIST")
         where, args = self._search_where(config, filter, before)
         query = self.SELECT_SQL + where + " ORDER BY checkpoint_id DESC"
         params = list(args)
@@ -184,7 +184,7 @@ class AsyncPostgresSaver(BasePostgresSaver):
                             value["checkpoint"],
                             value["channel_values"],
                         )
-            print("BERHASIL LEWAT ALIST2")
+            # print("BERHASIL LEWAT ALIST2")
             for value in values:
                 yield await self._load_checkpoint_tuple(value)
 
@@ -202,7 +202,7 @@ class AsyncPostgresSaver(BasePostgresSaver):
         Returns:
             The retrieved checkpoint tuple, or None if no matching checkpoint was found.
         """
-        print("MASUK AGET_TUPLE")
+        # print("MASUK AGET_TUPLE")
         thread_id = config["configurable"]["thread_id"]
         checkpoint_id = get_checkpoint_id(config)
         checkpoint_ns = config["configurable"].get("checkpoint_ns", "")
@@ -240,7 +240,7 @@ class AsyncPostgresSaver(BasePostgresSaver):
 
             return await self._load_checkpoint_tuple(value)
             
-        print("BERHASIL LEWAT AGET_TUPLE")
+        # print("BERHASIL LEWAT AGET_TUPLE")
 
     async def aput(
         self,
@@ -263,7 +263,7 @@ class AsyncPostgresSaver(BasePostgresSaver):
         Returns:
             RunnableConfig: Updated configuration after storing the checkpoint.
         """
-        print("MASUK APUT")
+        # print("MASUK APUT")
         configurable = config["configurable"].copy()
         thread_id = configurable.pop("thread_id")
         checkpoint_ns = configurable.pop("checkpoint_ns")
@@ -329,7 +329,7 @@ class AsyncPostgresSaver(BasePostgresSaver):
                 ),
             )
         
-        print("BERHASIL LEWAT APUT")
+        # print("BERHASIL LEWAT APUT")
         return next_config
 
     async def aput_writes(
@@ -348,7 +348,7 @@ class AsyncPostgresSaver(BasePostgresSaver):
             writes: List of writes to store, each as (channel, value) pair.
             task_id: Identifier for the task creating the writes.
         """
-        print("MASUK APUT_WRITES")
+        # print("MASUK APUT_WRITES")
         
         tenant_id = config["configurable"]["tenant_id"]
         user_id = config["configurable"]["user_id"]
@@ -372,7 +372,7 @@ class AsyncPostgresSaver(BasePostgresSaver):
         async with self._cursor(pipeline=True) as cur:
             await cur.executemany(query, params)
             
-        print("BERHASIL LEWAT APUT_WRITES")
+        # print("BERHASIL LEWAT APUT_WRITES")
 
     async def adelete_thread(self, thread_id: str) -> None:
         """Delete all checkpoints and writes associated with a thread ID.
