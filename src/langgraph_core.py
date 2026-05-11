@@ -49,7 +49,7 @@ async def put_new_memory(
         str: Success or failure message.
     """
     print("Tool: put_new_memory")
-    vector = await gemini_embedding.aembed_documents(query)
+    vector = await gemini_embedding.aembed_documents([query])
     user_id = uuid.UUID(state["user_id"])
     tenant_id = uuid.UUID(state["tenant_id"])
     memory_id = uuid.uuid4()
