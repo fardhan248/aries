@@ -60,9 +60,9 @@ async def streaming(db_pool, input_data: ChatInput, f: Optional[UploadFile] = No
                 if result.get("metadata", None) is not None:
                     async for chunk in agent.astream(
                         {
-                            "tenant_id": tenant_id,
-                            "user_id": user_id,
-                            "thread_id": thread_id,
+                            "tenant_id": str(tenant_id),
+                            "user_id": str(user_id),
+                            "thread_id": str(thread_id),
                             "messages": [HumanMessage(content=input_prompt)],
                             "mode": mode, 
                             "streaming_mode": True,
@@ -83,9 +83,9 @@ async def streaming(db_pool, input_data: ChatInput, f: Optional[UploadFile] = No
             else:
                 async for chunk in agent.astream(
                     {
-                        "tenant_id": tenant_id,
-                        "user_id": user_id,
-                        "thread_id": thread_id,
+                        "tenant_id": str(tenant_id),
+                        "user_id": str(user_id),
+                        "thread_id": str(thread_id),
                         "messages": [HumanMessage(content=input_prompt)],
                         "mode": mode, 
                         "streaming_mode": True,
@@ -141,9 +141,9 @@ async def chat_workflow(db_pool, input_data: dict, f: Optional[UploadFile] = Non
                 if result.get("metadata", None) is not None:
                     result_agent = await agent.ainvoke(
                         {
-                            "tenant_id": tenant_id,
-                            "user_id": user_id,
-                            "thread_id": thread_id,
+                            "tenant_id": str(tenant_id),
+                            "user_id": str(user_id),
+                            "thread_id": str(thread_id),
                             "messages": [HumanMessage(content=input_prompt)],
                             "mode": mode, 
                             "streaming_mode": False,
@@ -160,9 +160,9 @@ async def chat_workflow(db_pool, input_data: dict, f: Optional[UploadFile] = Non
             else:
                 result_agent = await agent.ainvoke(
                     {
-                        "tenant_id": tenant_id,
-                        "user_id": user_id,
-                        "thread_id": thread_id,
+                        "tenant_id": str(tenant_id),
+                        "user_id": str(user_id),
+                        "thread_id": str(thread_id),
                         "messages": [HumanMessage(content=input_prompt)],
                         "mode": mode, 
                         "streaming_mode": False,

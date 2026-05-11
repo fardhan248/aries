@@ -1,6 +1,6 @@
 from langchain.messages import AnyMessage
 
-import copy, operator
+import copy, operator, uuid
 from typing_extensions import TypedDict, Annotated, Literal, Any
 from pydantic import BaseModel, Field
 
@@ -36,9 +36,9 @@ def items_reducer(current: list, new: dict):
     return result    
 
 class State(TypedDict):
-    tenant_id: str
-    user_id: str
-    thread_id: str # thread_id
+    tenant_id: str #uuid.UUID
+    user_id: str #uuid.UUID
+    thread_id: str #uuid.UUID # thread_id
     mode: Literal["auto", "thinking", "fast"] = "auto" # auto, thinking (reasoning), fast (no reasoning)
     streaming_mode: bool = False
 

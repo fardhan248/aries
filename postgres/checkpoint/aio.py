@@ -1,11 +1,12 @@
 from __future__ import annotations
 
-import asyncio
+import asyncio, uuid
 from collections import defaultdict
 from collections.abc import AsyncIterator, Iterator, Sequence
 from contextlib import asynccontextmanager
 from typing import Any
 
+from langchain_core.messages import BaseMessage, message_to_dict
 from langchain_core.runnables import RunnableConfig
 from langgraph.checkpoint.base import (
     WRITES_IDX_MAP,
@@ -29,6 +30,16 @@ from langgraph.checkpoint.postgres.shallow import AsyncShallowPostgresSaver
 
 Conn = _ainternal.Conn  # For backward compatibility
 
+def convert_uuids(obj):
+    if isinstance(obj, BaseMessage):
+        return message_to_dict(obj)
+    elif isinstance(obj, dict):
+        return {k: convert_uuids(v) for k, v in obj.items()}
+    elif isinstance(obj, list):
+        return [convert_uuids(i) for i in obj]
+    elif isinstance(obj, uuid.UUID):
+        return str(obj)
+    return obj
 
 class AsyncPostgresSaver(BasePostgresSaver):
     """Asynchronous checkpointer that stores checkpoints in a Postgres database."""
@@ -261,16 +272,13 @@ class AsyncPostgresSaver(BasePostgresSaver):
         # inline primitive values in checkpoint table
         # others are stored in blobs table
         blob_values = {}
+        tenant_id = copy["channel_values"].pop("tenant_id", None) or config["configurable"].get("tenant_id")
+        user_id = copy["channel_values"].pop("user_id", None) or config["configurable"].get("user_id")
         for k, v in checkpoint["channel_values"].items():
             if v is None:
                 pass
             elif isinstance(v, (str, int, float, bool)):
-                if k == "tenant_id":
-                    tenant_id = copy["channel_values"].pop(k)
-                elif k == "user_id":
-                    user_id = copy["channel_values"].pop(k)
-                else:
-                    pass
+                pass
             else:
                 if k in ["selected_knowledge", "retrieved_session_knowledge", "memory_ids", "messages"]:
                     blob_values[k] = copy["channel_values"].pop(k)
@@ -291,6 +299,9 @@ class AsyncPostgresSaver(BasePostgresSaver):
                         blob_versions,
                     ),
                 )
+            
+            copy_json = convert_uuids(copy)
+            
             await cur.execute(
                 self.UPSERT_CHECKPOINTS_SQL,
                 (

@@ -49,8 +49,8 @@ async def put_new_memory(
         str: Success or failure message.
     """
     vector = await gemini_embedding.aembed_documents(query)
-    user_id = state["user_id"]
-    tenant_id = state["tenant_id"]
+    user_id = uuid.UUID(state["user_id"])
+    tenant_id = uuid.UUID(state["tenant_id"])
     memory_id = uuid.uuid4()
     
     try:
@@ -73,10 +73,10 @@ async def put_new_memory(
                         )
                     ],
                     "memory_ids": {
-                        "append": [memory_id]
+                        "append": [str(memory_id)]
                     },
                     "memory": {
-                        "append": [{memory_id: query}]
+                        "append": [{str(memory_id): query}]
                     },
                 }
             )
@@ -112,9 +112,10 @@ async def fetch_new_knowledge(
         Command: Updates selected_knowledge and chunk_knowledge state on success.
         str: Error message on failure.
     """
-    tenant_id = state["tenant_id"]
-    chunk_ids = [c_id for k in state["selected_knowledge"] for k_id in k for c_id in k[k_id]["chunk_ids"]]    
-    selected_knowledge_dict = {k_id: val for item in state["selected_knowledge"] for k_id, val in item.items()}
+    tenant_id = uuid.UUID(state["tenant_id"])
+    chunk_ids = [c_id for k in state["selected_knowledge"] for k_id in k for c_id in k[k_id]["chunk_ids"]]  
+    chunk_ids = [uuid.UUID(c_id) for c_id in chunk_ids]
+    selected_knowledge_dict = {uuid.UUID(k_id): val for item in state["selected_knowledge"] for k_id, val in item.items()}
     
     vector = await gemini_embedding.aembed_query(query)
     
@@ -139,7 +140,7 @@ async def fetch_new_knowledge(
                     replace_ids.add(knowledge_id)
                 
                 decrypted_content = await decrypt(content)
-                selected_knowledge_dict[knowledge_id]["chunk_ids"].append(chunk_id)
+                selected_knowledge_dict[knowledge_id]["chunk_ids"].append(str(chunk_id))
                 chunk_append.append({chunk_id: decrypted_content, "knowledge_id": knowledge_id})
                 
             if len(knowledge_id_append) > 0:
@@ -164,8 +165,8 @@ async def fetch_new_knowledge(
                 )
             ],
             "selected_knowledge": {
-                "append": [{k_id: val} for k_id, val in selected_knowledge_dict.items() if k_id in knowledge_id_append],
-                "replace": [{k_id: val} for k_id, val in selected_knowledge_dict.items() if k_id in replace_ids],
+                "append": [{str(k_id): val} for k_id, val in selected_knowledge_dict.items() if k_id in knowledge_id_append],
+                "replace": [{str(k_id): val} for k_id, val in selected_knowledge_dict.items() if k_id in replace_ids],
             },
             "chunk_knowledge": {
                 "append": chunk_append,
@@ -194,8 +195,8 @@ async def fetch_new_memory(
         Command: Updates memory and memory_ids state on success.
         str: Error message on failure.
     """
-    user_id = state["user_id"]
-    tenant_id = state["tenant_id"]
+    user_id = uuid.UUID(state["user_id"])
+    tenant_id = uuid.UUID(state["tenant_id"])
 
     vector = await gemini_embedding.aembed_query(query)
     
@@ -209,8 +210,8 @@ async def fetch_new_memory(
                 memory_id = result["memory_id"]
                 if memory_id not in state["memory_ids"]:
                     content = await decrypt(result["content"])
-                    memory_append.append({memory_id: content})
-                    memory_id_append.append(memory_id)
+                    memory_append.append({str(memory_id): content})
+                    memory_id_append.append(str(memory_id))
     
     except Exception as e:
         print(e)
@@ -256,11 +257,12 @@ async def fetch_new_knowledge_session(
         Command: Updates retrieved_session_knowledge and chunk_retrieved_session_knowledge state on success.
         str: Error message on failure.
     """
-    tenant_id = state["tenant_id"]
-    user_id = state["user_id"]
-    thread_id = state["thread_id"]
+    tenant_id = uuid.UUID(state["tenant_id"])
+    user_id = uuid.UUID(state["user_id"])
+    thread_id = uuid.UUID(state["thread_id"])
     chunk_ids = [c_id for k in state["chunk_retrieved_session_knowledge"] for k_id in k for c_id in k[k_id]["chunk_ids"]]
-    selected_knowledge_dict = {k_id: val for item in state["chunk_retrieved_session_knowledge"] for k_id, val in item.items()}
+    chunk_ids = [uuid.UUID(c_id) for c_id in chunk_ids]
+    selected_knowledge_dict = {uuid.UUID(k_id): val for item in state["chunk_retrieved_session_knowledge"] for k_id, val in item.items()}
     
     vector = await gemini_embedding.aembed_query(query)
     
@@ -285,7 +287,7 @@ async def fetch_new_knowledge_session(
                     replace_ids.add(knowledge_id)
                     
                 decrypted_content = await decrypt(content)
-                selected_knowledge_dict[knowledge_id]["chunk_ids"].append(chunk_id)
+                selected_knowledge_dict[knowledge_id]["chunk_ids"].append(str(chunk_id))
                 chunk_append.append({chunk_id: decrypted_content, "knowledge_id": knowledge_id})
                 
             if len(knowledge_id_append) > 0:
@@ -310,8 +312,8 @@ async def fetch_new_knowledge_session(
                 )
             ],
             "retrieved_session_knowledge": {
-                "append": [{k_id: val} for k_id, val in selected_knowledge_dict.items() if k_id in knowledge_id_append],
-                "replace": [{k_id: val} for k_id, val in selected_knowledge_dict.items() if k_id in replace_ids],
+                "append": [{str(k_id): val} for k_id, val in selected_knowledge_dict.items() if k_id in knowledge_id_append],
+                "replace": [{str(k_id): val} for k_id, val in selected_knowledge_dict.items() if k_id in replace_ids],
             },
             "chunk_retrieved_session_knowledge": {
                 "append": chunk_append,
@@ -484,7 +486,7 @@ async def should_continue(state: State):
     if not messages[-1].tool_calls:
         if mode == "thinking":
             return "reasoning"
-        return state["route"] # basic or coding_basic
+        return END #state["route"] # basic or coding_basic
         
     return "call_tools"
 
@@ -507,10 +509,11 @@ async def check_knowledge_session_ttl(state: State):
     if len(retrieved_session_knowledge) == 0:
         return Command(goto="check_knowledge_exist")
     
-    tenant_id = state["tenant_id"]
-    user_id = state["user_id"]
-    thread_id = state["thread_id"]
+    tenant_id = uuid.UUID(state["tenant_id"])
+    user_id = uuid.UUID(state["user_id"])
+    thread_id = uuid.UUID(state["thread_id"])
     knowledge_ids = [list(s.keys())[0] for s in retrieved_session_knowledge]
+    knowledge_ids = [uuid.UUID(k_id) for k_id in knowledge_ids]
     
     results = await pool.fetch(queries.QUERY_CHECK_KNOWLEDGE_SESSION_TTL, knowledge_ids, tenant_id, user_id, thread_id) # check if the document still exist in the database
     if len(results) > 0:
@@ -552,10 +555,11 @@ async def fetch_knowledge_session(state: State, config: RunnableConfig):
     Fetch knowledge session from existing retrieved_session_knowledge indexes.
     """    
     # Load chunk_retrieved_session_knowledge
-    tenant_id = state["tenant_id"]
-    user_id = state["user_id"]
-    thread_id = state["thread_id"]
+    tenant_id = uuid.UUID(state["tenant_id"])
+    user_id = uuid.UUID(state["user_id"])
+    thread_id = uuid.UUID(state["thread_id"])
     chunk_ids = [c_id for k in state["retrieved_session_knowledge"] for k_id in k for c_id in k[k_id]["chunk_ids"]]
+    chunk_ids = [uuid.UUID(c_id) for c_id in chunk_ids]
     
     chunk_knowledges = await pool.fetch(queries.QUERY_FETCH_KNOWLEDGE_SESSION, chunk_ids, tenant_id, user_id, thread_id)
     item_append = []
@@ -563,7 +567,7 @@ async def fetch_knowledge_session(state: State, config: RunnableConfig):
         s_knowledge_id = item["s_knowledge_id"]
         chunk_id = item["chunk_id"]
         content = await decrypt(item["content"])
-        item_append.append({chunk_id: content, "s_knowledge_id": s_knowledge_id})
+        item_append.append({str(chunk_id): content, "s_knowledge_id": str(s_knowledge_id)})
     
     return {
         "chunk_retrieved_session_knowledge": {
@@ -586,8 +590,9 @@ async def check_knowledge_exist(state: State):
     if len(selected_knowledge) == 0:
         return Command(goto="check_memory_exist_and_fetch")
     
-    tenant_id = state["tenant_id"]
+    tenant_id = uuid.UUID(state["tenant_id"])
     knowledge_ids = [list(s.keys())[0] for s in selected_knowledge]
+    knowledge_ids = [uuid.UUID(k_id) for k_id in knowledge_ids]
     
     results = await pool.fetch(queries.QUERY_CHECK_KNOWLEDGE_EXIST, knowledge_ids, tenant_id) # check if the document still exist in the database
     if len(results) > 0:
@@ -629,8 +634,9 @@ async def fetch_knowledge(state: State):
     Fetch knowledge from existing selected_knowledge indexes.
     """
     # Load chunk_knowledge
-    tenant_id = state["tenant_id"]
+    tenant_id = uuid.UUID(state["tenant_id"])
     chunk_ids = [c_id for k in state["selected_knowledge"] for k_id in k for c_id in k[k_id]["chunk_ids"]]
+    chunk_ids = [uuid.UUID(c_id) for c_id in chunk_ids]
     
     chunk_knowledges = await pool.fetch(queries.QUERY_FETCH_KNOWLEDGE, chunk_ids, tenant_id)
     item_append = []
@@ -638,7 +644,7 @@ async def fetch_knowledge(state: State):
         knowledge_id = item["knowledge_id"]
         chunk_id = item["chunk_id"]
         content = await decrypt(item["content"])
-        item_append.append({chunk_id: content, "knowledge_id": knowledge_id})
+        item_append.append({str(chunk_id): content, "knowledge_id": str(knowledge_id)})
     
     return {
         "chunk_knowledge": {
@@ -656,9 +662,10 @@ async def judge_knowledge(state: State):
 async def check_memory_exist_and_fetch(state: State):
     """If there is no chunk from database, drop memory indices"""
     print("Node: check_memory_exist_and_fetch")
-    tenant_id = state["tenant_id"]
-    user_id = state["user_id"]
+    tenant_id = uuid.UUID(state["tenant_id"])
+    user_id = uuid.UUID(state["user_id"])
     memory_ids = copy.deepcopy(state["memory_ids"])
+    memory_ids = [uuid.UUID(m_id) for m_id in memory_ids]
     
     if len(memory_ids) == 0:
         return Command(goto="rag")
@@ -674,7 +681,7 @@ async def check_memory_exist_and_fetch(state: State):
     for i, m_id in enumerate(memory_ids):
         if m_id not in fetched_memory_ids:
             idx_remove.append(i)
-            item_remove.append(memory_ids[i])
+            item_remove.append(str(memory_ids[i]))
             
     memory_ids = [x for i, x in enumerate(memory_ids) if i not in idx_remove]
             
@@ -691,7 +698,7 @@ async def check_memory_exist_and_fetch(state: State):
     else:
         item_append = []
         for item in results:
-            memory_id = item["memory_id"]
+            memory_id = str(item["memory_id"])
             if memory_id in memory_ids:
                 content = await decrypt(item["content"])
                 item_append.append({memory_id: content})
@@ -742,12 +749,15 @@ async def trimming_message(messages):
             
     return trimmed_msg
 
-async def rag(state: State, config: RunnableConfig):
+async def rag(state: State):
     print("Node: rag")
-    tenant_id = config["configurable"]["tenant_id"]
+    tenant_id = str(state["tenant_id"]) #config["configurable"]["tenant_id"]
     selected_knowledge = copy.deepcopy(state["selected_knowledge"]) # [{knowledge_id: {"metadata": metadata, "chunk_ids": [id_1, id_2]}}]
     knowledge_ids = [k_id for x in selected_knowledge for k_id in x]
     chunk_ids = [c_id for k in selected_knowledge for k_id in k for c_id in k[k_id]["chunk_ids"]]
+    
+    knowledge_ids = [uuid.UUID(k_id) for k_id in knowledge_ids]
+    chunk_ids = [uuid.UUID(c_id) for c_id in chunk_ids]
     
     messages = trim_messages(
         state["messages"],
@@ -790,11 +800,11 @@ async def rag(state: State, config: RunnableConfig):
         knowledge_id_metadata = {k_id: x["metadata"] for k_id, x in zip(knowledge_ids_from_chunks, rows_fetch_knowledges)}
     
     # Check if the knowledge is already retrieved on chunk_knowledge
-    item_append_knowledge = {k_id: val for x in selected_knowledge for k_id, val in x.items()}
+    item_append_knowledge = {str(k_id): val for x in selected_knowledge for k_id, val in x.items()}
     for k_id, meta in knowledge_id_metadata.items():
         if k_id not in knowledge_ids:
             metadata = await decrypt(meta)
-            item_append_knowledge[k_id] = {"metadata": metadata, "chunk_ids": []}
+            item_append_knowledge[str(k_id)] = {"metadata": metadata, "chunk_ids": []}
     
     item_append = []
     ids_replace = set()
@@ -803,8 +813,8 @@ async def rag(state: State, config: RunnableConfig):
         if chunk_id not in chunk_ids:
             content = await decrypt(item["content"])
             knowledge_id = item["knowledge_id"] 
-            item_append.append({chunk_id: content, "knowledge_id": knowledge_id})
-            item_append_knowledge[knowledge_id]["chunk_ids"].append(chunk_id)
+            item_append.append({str(chunk_id): content, "knowledge_id": str(knowledge_id)})
+            item_append_knowledge[knowledge_id]["chunk_ids"].append(str(chunk_id))
             
             if knowledge_id in knowledge_ids:
                 ids_replace.add(knowledge_id)
@@ -813,8 +823,8 @@ async def rag(state: State, config: RunnableConfig):
         goto="router",
         update={
             "selected_knowledge": {
-                "append": [{k_id: val} for k_id, val in item_append_knowledge.items() if k_id not in knowledge_ids],
-                "replace": [{k_id: val} for k_id, val in item_append_knowledge.items() if k_id in ids_replace]
+                "append": [{k_id: val} for k_id, val in item_append_knowledge.items() if uuid.UUID(k_id) not in knowledge_ids],
+                "replace": [{k_id: val} for k_id, val in item_append_knowledge.items() if uuid.UUID(k_id) in ids_replace]
             },
             "chunk_knowledge": {
                 "append": item_append,
@@ -919,7 +929,7 @@ async def basic(state: State):
     else:
         response = await gemini_instruct_tools.ainvoke(final_query)
     
-    return {"messages": response}
+    return {"messages": [response]}
 
 ## Agent: Coding basic
 async def coding_basic(state: State):
@@ -955,7 +965,7 @@ async def coding_basic(state: State):
     else:
         response = await gemini_instruct_tools.ainvoke(final_query)
     
-    return {"messages": response}
+    return {"messages": [response]}
     
 ## Agent: Coding react
 async def coding_react(state: State):
@@ -994,7 +1004,10 @@ async def coding_react(state: State):
         })        
         
     else:
-        msg = last_thought.content[0]["text"].replace("Thought: QUERY:", "").strip()
+        content = last_thought.content
+        if isinstance(content, list):
+            content = content[0]["text"]
+        msg = content.replace("Thought: QUERY:", "").strip()
         
         system_prompt = prompts.CODING_REACT_SYSTEM_QUERY.format_map({
             "msg": msg,
@@ -1095,7 +1108,10 @@ async def thinking_react(state: State):
         })
         
     else:
-        msg = last_thought.content[0]["text"].replace("Thought: QUERY:", "").strip()
+        content = last_thought.content
+        if isinstance(content, list):
+            content = content[0]["text"]
+        msg = content.replace("Thought: QUERY:", "").strip()
         
         system_prompt = prompts.THINKING_REACT_SYSTEM_QUERY.format_map({
             "msg": msg,
@@ -1173,7 +1189,7 @@ async def reasoning(state: State):
         return Command(
             goto=node_end,
             update={
-                "messages": AIMessage(content="Thought: I have gathered enough information"),
+                "messages": [AIMessage(content="Thought: I have gathered enough information")],
                 "iteration": iteration,
             }
         )
@@ -1213,7 +1229,7 @@ async def reasoning(state: State):
         return Command(
             goto=state["route"],
             update={
-                "messages": AIMessage(content=f"Thought: {decision.content[0]['text']}"),
+                "messages": [AIMessage(content=f"Thought: {decision.content[0]['text']}")],
                 "iteration": iteration,
             }
         )
@@ -1221,7 +1237,7 @@ async def reasoning(state: State):
     return Command(
         goto=node_end,
         update={
-            "messages": AIMessage(content=f"Thought: {decision.content[0]['text']}"),
+            "messages": [AIMessage(content=f"Thought: {decision.content[0]['text']}")],
             "iteration": iteration,
         }
     )
@@ -1254,18 +1270,18 @@ async def get_agent():
     
     
     builder.add_edge(START, "check_knowledge_session_ttl")
-    builder.add_edge("check_knowledge_session_ttl", "fetch_knowledge_session")
-    builder.add_edge("check_knowledge_session_ttl", "check_knowledge_exist")
+    # builder.add_edge("check_knowledge_session_ttl", "fetch_knowledge_session")
+    # builder.add_edge("check_knowledge_session_ttl", "check_knowledge_exist")
     builder.add_edge("fetch_knowledge_session", "judge_knowledge_session")
     builder.add_edge("judge_knowledge_session", "check_knowledge_exist")
 
-    builder.add_edge("check_knowledge_exist", "fetch_knowledge")
-    builder.add_edge("check_knowledge_exist", "check_memory_exist_and_fetch")
+    # builder.add_edge("check_knowledge_exist", "fetch_knowledge")
+    # builder.add_edge("check_knowledge_exist", "check_memory_exist_and_fetch")
     builder.add_edge("fetch_knowledge", "judge_knowledge")
     builder.add_edge("judge_knowledge", "check_memory_exist_and_fetch")
     
-    builder.add_edge("check_memory_exist_and_fetch", "rag")
-    builder.add_edge("check_memory_exist_and_fetch", "judge_memory")
+    # builder.add_edge("check_memory_exist_and_fetch", "rag")
+    # builder.add_edge("check_memory_exist_and_fetch", "judge_memory")
     builder.add_edge("judge_memory", "rag")
     # builder.add_conditional_edges("check_memory_exist", check_any_documents_uploaded, ["chunk_knowledge_session", "router"])
     # builder.add_conditional_edges("fetch_memory", check_any_documents_uploaded, ["chunk_knowledge_session", "router"])
@@ -1275,9 +1291,9 @@ async def get_agent():
     #builder.add_conditional_edges("fetch_history_messages", check_any_documents_uploaded, ["chunk_knowledge_session", "router"])
     # builder.add_edge("chunk_knowledge_session", "router")
     builder.add_edge("rag", "router")
-    builder.add_edge("router", "basic")
-    builder.add_edge("router", "coding_basic")
-    builder.add_edge("router", "reasoning")
+    # builder.add_edge("router", "basic")
+    # builder.add_edge("router", "coding_basic")
+    # builder.add_edge("router", "reasoning")
     # builder.add_conditional_edges("router", lambda s: s["route"], ["basic", "coding_basic", "reasoning"])
     
     # non-reasoning (basic and coding)
@@ -1288,10 +1304,10 @@ async def get_agent():
     builder.add_edge("call_tools", "coding_basic")
     
     # thinking-reasoning (coding and thinking)
-    builder.add_edge("reasoning", "coding_react")
-    builder.add_edge("reasoning", "coding_end")
-    builder.add_edge("reasoning", "thinking_react")
-    builder.add_edge("reasoning", "thinking_end")
+    # builder.add_edge("reasoning", "coding_react")
+    # builder.add_edge("reasoning", "coding_end")
+    # builder.add_edge("reasoning", "thinking_react")
+    # builder.add_edge("reasoning", "thinking_end")
     # builder.add_conditional_edges("reasoning", lambda s: s["route"], ["coding_react", "coding_end", "thinking_react", "thinking_end"])
     ## coding
     builder.add_conditional_edges("coding_react", should_continue, ["call_tools", "reasoning"])

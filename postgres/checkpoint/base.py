@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 import random
-import warnings
+import warnings, uuid
 from collections.abc import Sequence
 from importlib.metadata import version as get_version
 from typing import Any, cast
@@ -73,7 +73,7 @@ group by checkpoint_id
 """
 
 UPSERT_CHECKPOINT_BLOBS_SQL = """
-    INSERT INTO "Session_blobs" (tenant_id, user_id, thread_id, checkpoint_ns, channel, version, type, checkpoint_blob)
+    INSERT INTO "Session_blobs" (tenant_id, user_id, thread_id, checkpoint_ns, channel, version, type, blob)
     VALUES (%s, %s, %s, %s, %s, %s, %s, %s)
     ON CONFLICT (thread_id, checkpoint_ns, channel, version) DO NOTHING
 """
@@ -102,6 +102,25 @@ INSERT_CHECKPOINT_WRITES_SQL = """
     ON CONFLICT (thread_id, checkpoint_ns, checkpoint_id, task_id, idx) DO NOTHING
 """
 
+def convert_uuid_keys(obj):
+    if isinstance(obj, dict):
+        return {str(k) if isinstance(k, uuid.UUID) else k: convert_uuid_keys(v) for k, v in obj.items()}
+    elif isinstance(obj, list):
+        return [convert_uuid_keys(i) for i in obj]
+    return obj
+
+def restore_uuid_keys(obj):
+    if isinstance(obj, dict):
+        restored = {}
+        for k, v in obj.items():
+            try:
+                restored[uuid.UUID(k)] = restore_uuid_keys(v)
+            except (ValueError, AttributeError):
+                restored[k] = restore_uuid_keys(v)
+        return restored
+    elif isinstance(obj, list):
+        return [restore_uuid_keys(i) for i in obj]
+    return obj
 
 class BasePostgresSaver(BaseCheckpointSaver[str]):
     SELECT_SQL = SELECT_SQL
