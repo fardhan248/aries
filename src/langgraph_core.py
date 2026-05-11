@@ -2,7 +2,7 @@ from models.gemini import gemini, gemini_instruct, gemini_thinking_reasoning, ge
 
 from langchain.tools import tool
 from langgraph.graph import StateGraph, START, END
-from langchain_core.messages import ToolMessage, SystemMessage, AIMessage
+from langchain_core.messages import ToolMessage, SystemMessage, AIMessage, HumanMessage
 from langchain_core.messages.utils import trim_messages
 from langchain_core.runnables import RunnableConfig
 from langgraph.types import Command
@@ -48,7 +48,7 @@ async def put_new_memory(
         Command: Updates memory_ids and memory state on success.
         str: Success or failure message.
     """
-    vector = await gemini_embedding.aembed_documents([query])
+    vector = await gemini_embedding.aembed_documents(query)
     user_id = state["user_id"]
     tenant_id = state["tenant_id"]
     memory_id = uuid.uuid4()
@@ -501,6 +501,7 @@ async def should_continue(state: State):
 ## Fetch knowledge_session node if any
 async def check_knowledge_session_ttl(state: State):
     """If there is no chunk from database, drop knowledge indices"""
+    print("Node: check_knowledge_session_ttl")
     retrieved_session_knowledge = copy.deepcopy(state["retrieved_session_knowledge"])
     
     if len(retrieved_session_knowledge) == 0:
@@ -579,10 +580,11 @@ async def judge_knowledge_session(state: State):
 ## Fetch knowledge node if any
 async def check_knowledge_exist(state: State):
     """If there is no chunk from database, drop knowledge indices"""
+    print("Node: check_knowledge_exist")
     selected_knowledge = copy.deepcopy(state["selected_knowledge"])
     
     if len(selected_knowledge) == 0:
-        return Command(goto="check_memory_exist")
+        return Command(goto="check_memory_exist_and_fetch")
     
     tenant_id = state["tenant_id"]
     knowledge_ids = [list(s.keys())[0] for s in selected_knowledge]
@@ -604,7 +606,7 @@ async def check_knowledge_exist(state: State):
     
     if len(selected_knowledge) == 0 and len(item_remove) > 0:
         return Command(
-            goto="check_memory_exist",
+            goto="check_memory_exist_and_fetch",
             update={
                 "selected_knowledge": {
                     "remove": item_remove,
@@ -653,6 +655,7 @@ async def judge_knowledge(state: State):
 ## Fetch memory node if any
 async def check_memory_exist_and_fetch(state: State):
     """If there is no chunk from database, drop memory indices"""
+    print("Node: check_memory_exist_and_fetch")
     tenant_id = state["tenant_id"]
     user_id = state["user_id"]
     memory_ids = copy.deepcopy(state["memory_ids"])
@@ -734,11 +737,13 @@ async def trimming_message(messages):
         if msg.type == "tool":
             trimmed_msg.append({"role": msg.type, "content": msg.content})
         else: # human or ai
-            trimmed_msg.append({"role": msg.type, "content": await extract_content(msg)})
+            extracted_content = await extract_content(msg)
+            trimmed_msg.append({"role": msg.type, "content": extracted_content})
             
     return trimmed_msg
 
 async def rag(state: State, config: RunnableConfig):
+    print("Node: rag")
     tenant_id = config["configurable"]["tenant_id"]
     selected_knowledge = copy.deepcopy(state["selected_knowledge"]) # [{knowledge_id: {"metadata": metadata, "chunk_ids": [id_1, id_2]}}]
     knowledge_ids = [k_id for x in selected_knowledge for k_id in x]
@@ -768,8 +773,8 @@ async def rag(state: State, config: RunnableConfig):
         "knowledges": knowledges,
     })
     
-    llm_output = await gemini_instruct.ainvoke([SystemMessage(content=system_query)])
-    vector = await gemini_embedding.aembed_query(llm_output.content)
+    llm_output = await gemini_instruct.ainvoke([HumanMessage(content=system_query)])
+    vector = await gemini_embedding.aembed_query(llm_output.content[0]["text"])
     
     # Retrieve from database 
     async with pool.acquire() as conn:
@@ -830,6 +835,7 @@ router_model = gemini_instruct.with_structured_output(
 ## Agent: LLM-Instruct/router (fetch knowledge/knowledge_session/memory baru bila perlu)
 async def router(state: State): # Tambahkan fungsi atau state untuk format output yang tetap {route: "", mode: ""}
     """Jika prompt user terkait dengan (dokumen) perusahaan, fetch_knowledge. Jika diminta mengingat, fetch user_memory."""
+    print("Node: router")
     # Router menentukan mode "thinking" atau "fast" sesuai input user.
     messages = trim_messages(
         state["messages"],
@@ -861,7 +867,7 @@ async def router(state: State): # Tambahkan fungsi atau state untuk format outpu
             "latest_message": trimmed_msg[-1],
         })
         
-    response = await router_model.ainvoke([SystemMessage(content=system_query)])
+    response = await router_model.ainvoke([HumanMessage(content=system_query)])
     
     if response["route"] == "coding_react" or response["route"] == "thinking_react":
         return Command(
@@ -881,6 +887,7 @@ async def router(state: State): # Tambahkan fungsi atau state untuk format outpu
     
 ## Agent: Basic (same as router model), Visual (Photo, Video) Analysis (non-thinking)
 async def basic(state: State):
+    print("Node: basic")
     messages = trim_messages(
         state["messages"],
         strategy="last",
@@ -910,12 +917,13 @@ async def basic(state: State):
     if state["streaming_mode"] == True:
         pass
     else:
-        response = gemini_instruct_tools.ainvoke(final_query)
+        response = await gemini_instruct_tools.ainvoke(final_query)
     
     return {"messages": response}
 
 ## Agent: Coding basic
 async def coding_basic(state: State):
+    print("Node: coding_basic")
     messages = trim_messages(
         state["messages"],
         strategy="last",
@@ -951,6 +959,7 @@ async def coding_basic(state: State):
     
 ## Agent: Coding react
 async def coding_react(state: State):
+    print("Node: coding_react")
     messages = trim_messages(
         state["messages"],
         strategy="last",
@@ -995,11 +1004,12 @@ async def coding_react(state: State):
             "history": trimmed_msg[:-1],
         })    
     
-    result = await gemini_thinking_reasoning_tools.ainvoke([SystemMessage(content=system_prompt)])
+    result = await gemini_thinking_reasoning_tools.ainvoke([HumanMessage(content=system_prompt)])
     
     if result.tool_calls:
+        extracted_content = await extract_content(result)
         return {
-            "messages": [AIMessage(content=f"Observation with tools: {await extract_content(result)}")],
+            "messages": [AIMessage(content=f"Observation with tools: {extracted_content}")],
             "last_query": msg,
         }
     else:
@@ -1015,6 +1025,7 @@ async def coding_react(state: State):
     
 ## Agent: Coding end (conclusion)
 async def coding_end(state: State):
+    print("Node: coding_end")
     messages = trim_messages(
         state["messages"],
         strategy="last",
@@ -1043,12 +1054,13 @@ async def coding_end(state: State):
     if state["streaming_mode"] == True:
         pass
     else:
-        response = await gemini_instruct.ainvoke([SystemMessage(content=system_prompt), *messages])
+        response = await gemini_instruct.ainvoke([HumanMessage(content=system_prompt), *messages])
         
     return response
     
 ## Agent: Thinking react
 async def thinking_react(state: State):
+    print("Node: thinking_react")
     messages = trim_messages(
         state["messages"],
         strategy="last",
@@ -1093,7 +1105,7 @@ async def thinking_react(state: State):
             "history": trimmed_msg[:-1],
         })
     
-    result = await gemini_thinking_reasoning_tools.ainvoke([SystemMessage(content=system_prompt)])
+    result = await gemini_thinking_reasoning_tools.ainvoke([HumanMessage(content=system_prompt)])
     
     if result.tool_calls:
         return {
@@ -1113,6 +1125,7 @@ async def thinking_react(state: State):
     
 ## Agent: Thinking end (conclusion)
 async def thinking_end(state: State):
+    print("Node: thinking_end")
     messages = trim_messages(
         state["messages"],
         strategy="last",
@@ -1141,12 +1154,13 @@ async def thinking_end(state: State):
     if state["streaming_mode"] == True:
         pass
     else:
-        response = await gemini_instruct.ainvoke([SystemMessage(content=system_prompt), *messages])
+        response = await gemini_instruct.ainvoke([HumanMessage(content=system_prompt), *messages])
         
     return response
     
 ## Reasoning node untuk Agent Thinking dan Coding (untuk pengembangan: tambahkan interrupt dan/atau user input sebelum masuk reasoning node)
 async def reasoning(state: State):
+    print("Node: reasoning")
     # route = state["route"] # coding_react or thinking_react
     
     if state["route"] == "coding_react":
@@ -1193,7 +1207,7 @@ async def reasoning(state: State):
         "iteration": iteration,
     })   
     
-    decision = await gemini_thinking_reasoning.ainvoke([SystemMessage(content=prompt)])
+    decision = await gemini_thinking_reasoning.ainvoke([HumanMessage(content=prompt)])
     
     if decision.content[0]["text"].startswith("QUERY:"):
         return Command(
