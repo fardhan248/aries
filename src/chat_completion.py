@@ -43,6 +43,7 @@ async def streaming(db_pool, input_data: ChatInput, f: Optional[UploadFile] = No
     }
     
     if f is not None:
+        print("Upload file")
         result = await put_new_knowledge_session(pool, f, config, input_prompt)
         
         if result["s_knowledge_id"] != 0:
@@ -124,6 +125,7 @@ async def chat_workflow(db_pool, input_data: dict, f: Optional[UploadFile] = Non
     }
     
     if f is not None:
+        print("Upload file")
         result = await put_new_knowledge_session(pool, f, config, input_prompt)
         
         if result["s_knowledge_id"] != 0:

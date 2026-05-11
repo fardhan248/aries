@@ -474,7 +474,7 @@ tools_by_name = {tool.name: tool for tool in tools}
 async def call_tools(state: State):
     outputs = []
     for tool_call in state["messages"][-1].tool_calls:
-        tool_result = await tools_by_name[tool_call["name"]].ainvoke(tool_call["args"])
+        tool_result = await tools_by_name[tool_call["name"]].ainvoke(tool_call)
         
         if not isinstance(tool_result, Command):
             outputs.append(
@@ -743,7 +743,7 @@ async def extract_content(message) -> str:
         )
         
     if isinstance(message, AIMessage) and message.tool_calls:
-        tool_names = [t["name"] for t in messag.tool_calls]
+        tool_names = [t["name"] for t in message.tool_calls]
         return f"AI: content: {content}, tool calls: {tool_names}"
     
     return content
@@ -870,29 +870,36 @@ async def router(state: State): # Tambahkan fungsi atau state untuk format outpu
     trimmed_msg = await trimming_message(messages)
     
     if state["mode"] == "auto":
+        print("auto mode")
         system_query = prompts.AUTO_SYSTEM_QUERY.format_map({
             "trimmed_msg_auto": trimmed_msg[:-1],
             "latest_message": trimmed_msg[-1],
         })
         
     elif state["mode"] == "thinking":
+        print("thinking mode")
         system_query = prompts.THINKING_SYSTEM_QUERY.format_map({
             "trimmed_msg_thinking": trimmed_msg[:-1],
             "latest_message": trimmed_msg[-1],
+            "format_mode": state["mode"],
         })
         
     else: # fast
+        print("fast mode")
         system_query = prompts.FAST_SYSTEM_QUERY({
             "trimmed_msg_fast": trimmed_msg[:-1],
             "latest_message": trimmed_msg[-1],
+            "format_mode": state["mode"],
         })
         
     response = await router_model.ainvoke([HumanMessage(content=system_query)])
     
-    if response["route"] == "coding_react" or response["route"] == "thinking_react":
+    print(response)
+    
+    if (response["route"] == "coding_react" or response["route"] == "thinking_react"):
         return Command(
             goto="reasoning",
-            update={"route": response["route"]}
+            update={"route": response["route"], "mode": "thinking"}
         )
     elif response["route"] == "coding_basic":
         return Command(
@@ -1080,7 +1087,7 @@ async def coding_end(state: State):
     else:
         response = await gemini_instruct.ainvoke([HumanMessage(content=system_prompt), *messages])
         
-    return response
+    return {"messages": [response]}
     
 ## Agent: Thinking react
 async def thinking_react(state: State):
@@ -1183,7 +1190,7 @@ async def thinking_end(state: State):
     else:
         response = await gemini_instruct.ainvoke([HumanMessage(content=system_prompt), *messages])
         
-    return response
+    return {"messages": [response]}
     
 ## Reasoning node untuk Agent Thinking dan Coding (untuk pengembangan: tambahkan interrupt dan/atau user input sebelum masuk reasoning node)
 async def reasoning(state: State):
@@ -1196,6 +1203,7 @@ async def reasoning(state: State):
         node_end = "thinking_end"
     
     iteration = state.get("iteration", 0)
+    print(iteration)
     if iteration >= 3:
         return Command(
             goto=node_end,
@@ -1323,9 +1331,11 @@ async def get_agent():
     ## coding
     builder.add_conditional_edges("coding_react", should_continue, ["call_tools", "reasoning"])
     builder.add_edge("call_tools", "coding_react")
+    builder.add_edge("coding_end", END)
     ## thinking
     builder.add_conditional_edges("thinking_react", should_continue, ["call_tools", "reasoning"])
     builder.add_edge("call_tools", "thinking_react")
+    builder.add_edge("thinking_end", END)
     
     return builder
 

@@ -22,7 +22,7 @@ async def hello():
 
 
 # Chat Endpoints
-@router.post("/chat/new")
+@router.post("/chat/new") #✅
 async def make_new_chat(
     request: Request,
     input_data: str = Form(...),
@@ -32,7 +32,7 @@ async def make_new_chat(
     
     input_data = ChatInput(**json.loads(input_data))
     
-    if input_data.thread_id is not None:    
+    if f is not None:
         file_content = await f.read()
         f2 = UploadFile(
             filename=f.filename,
@@ -40,7 +40,10 @@ async def make_new_chat(
             headers=Headers({"content_type": f.content_type}),
             size=f.size,
         )
-        
+    else:   
+        f2=f
+    
+    if input_data.thread_id is not None:    
         return await chat(
                 request=request,
                 thread_id=input_data.thread_id,
@@ -54,18 +57,6 @@ async def make_new_chat(
         return result
        
     input_data.thread_id = result["thread_id"]
-    
-    if f is not None:
-        file_content = await f.read()
-        f2 = UploadFile(
-            filename=f.filename,
-            file=io.BytesIO(file_content),
-            headers=Headers({"content_type": f.content_type}),
-            size=f.size,
-        )
-    else:   
-        f2=f
-     
         
     return await chat(
             request=request,
@@ -111,7 +102,7 @@ async def make_new_chat(
             # media_type="text/plain",
         # )
 
-@router.post("/chat/{thread_id}")
+@router.post("/chat/{thread_id}") #✅
 async def chat(
     request: Request, 
     thread_id: uuid.UUID, 
@@ -119,7 +110,7 @@ async def chat(
     f: Optional[UploadFile] = File(None),
 ):
     pool = request.app.state.pool
-    
+    print(f)
     input_data = ChatInput(**json.loads(input_data))
     streaming = input_data.streaming
     
@@ -128,14 +119,14 @@ async def chat(
     
     if streaming == False:
         if f:
-            return await chat_workflow(pool, input_data, f)
+            return await chat_workflow(pool, input_data, f2)
         else:
             return await chat_workflow(pool, input_data)
     
     else:
         if f:
             return StreamingResponse(
-                streaming(pool, input_data, f), 
+                streaming(pool, input_data, f2), 
                 media_type="text/plain",
             )
         else:

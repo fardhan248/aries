@@ -128,15 +128,17 @@ async def put_new_knowledge_session(pool, f, config, prompt):
                 }
             )
         )
+        
+        # Chunking document
+        chunks, pages = await chunk_document(f, file_bytes)
+        
+        result = await save_chunks_session_to_db(pool, chunks, pages, f, configurable, prompt)
+        
+        return result
+
     except Exception as e:
         print(e)
-    
-    # Chunking document
-    chunks, pages = await chunk_document(f, file_bytes)
-    
-    result = await save_chunks_session_to_db(pool, chunks, pages, f, configurable, prompt)
-    
-    return result
+        return {"status": "double", "s_knowledge_id": 0, "user_id": 0}
 
 ## Tool: Put new knowledge (by tenant admin)
 async def save_chunks_to_db(pool, chunks, pages, f, tenant_id):
@@ -204,12 +206,14 @@ async def put_new_knowledge(db_pool, f, tenant_id):
                 }
             )
         )
+        
+        # Chunking document
+        chunks, pages = await chunk_document(f, file_bytes)
+        
+        result = await save_chunks_to_db(pool, chunks, pages, f, tenant_id)
+      
+        return result
+    
     except Exception as e:
         print(e)
-    
-    # Chunking document
-    chunks, pages = await chunk_document(f, file_bytes)
-    
-    result = await save_chunks_to_db(pool, chunks, pages, f, tenant_id)
-  
-    return result
+        return {"status": "double", "s_knowledge_id": 0, "user_id": 0}
