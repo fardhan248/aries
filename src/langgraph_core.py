@@ -814,7 +814,7 @@ async def rag(state: State):
             content = await decrypt(item["content"])
             knowledge_id = item["knowledge_id"] 
             item_append.append({str(chunk_id): content, "knowledge_id": str(knowledge_id)})
-            item_append_knowledge[knowledge_id]["chunk_ids"].append(str(chunk_id))
+            item_append_knowledge[str(knowledge_id)]["chunk_ids"].append(str(chunk_id))
             
             if knowledge_id in knowledge_ids:
                 ids_replace.add(knowledge_id)

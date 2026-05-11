@@ -300,7 +300,7 @@ class AsyncPostgresSaver(BasePostgresSaver):
                     ),
                 )
             
-            copy_json = convert_uuids(copy)
+            # copy_json = convert_uuids(copy)
             
             await cur.execute(
                 self.UPSERT_CHECKPOINTS_SQL,
