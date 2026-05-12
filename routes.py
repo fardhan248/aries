@@ -142,7 +142,7 @@ async def add_company(request: Request, tenant: str = Body(...)):
 
     return await new_company(pool, tenant)
     
-@router.post("/add_member/{tenant_id}/add_user/") #✅
+@router.post("/add_member/{tenant_id}/add_user") #✅
 async def add_user(
     request: Request, 
     tenant_id: uuid.UUID, 
