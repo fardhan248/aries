@@ -83,6 +83,7 @@ async def save_chunks_session_to_db(pool, chunks, pages, filename, content_type,
         "filename": filename,
         "content-type": content_type,
         "pages": pages,
+        "len_chunks": len(chunks),
     }
     
     vector = await gemini_embedding.aembed_documents(chunks)
@@ -162,6 +163,7 @@ async def save_chunks_to_db(pool, chunks, pages, filename, content_type, tenant_
         "filename": filename,
         "content-type": content_type,
         "pages": pages,
+        "len_chunks": len(chunks),
     }
 
     vector = await gemini_embedding.aembed_documents(chunks)
