@@ -221,7 +221,7 @@ async def put_new_knowledge(db_pool, f, tenant_id):
         )
         
         # Chunking document
-        chunks, pages = await chunk_document(filename, content_type, file_bytes)
+        chunks, pages = await chunk_document(content_type, file_bytes)
         
         result = await save_chunks_to_db(pool, chunks, pages, filename, content_type, tenant_id)
       

@@ -493,12 +493,11 @@ async def basic_should_continue(state: State):
     messages = state["messages"]
     
     tool_calls = getattr(messages[-1], "tool_calls", [])
-    print(tool_calls)
+    
     if len(tool_calls) == 0:
         print("END")
         return END #state["route"] # basic or coding_basic
         
-    print(messages)
     return "basic_tools"
     
 async def coding_basic_should_continue(state: State):
