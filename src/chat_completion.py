@@ -2,74 +2,37 @@ from postgres.checkpoint.aio import AsyncPostgresSaver
 from langchain_core.messages import HumanMessage, message_to_dict
 from langchain_core.runnables import RunnableConfig
 
-import os, uuid
+import os, uuid, logging, traceback
 from models.gemini import gemini
 from utils.documents_utils import put_new_knowledge_session
 from fastapi import UploadFile
 from src.langgraph_core import get_agent
 from dotenv import load_dotenv
 from typing_extensions import Optional
-from utils.documents_utils import encrypt, decrypt
-from string_utils.database_queries import TitleQueries
-from string_utils.prompts import PromptTitle
+from body_models.router_models import ChatInput
+
+import src.langgraph_core as lang_core
 
 load_dotenv()
 
 DB_URI = os.getenv("DATABASE_URL")
 pool = None 
 
-titlequeries = TitleQueries()
-prompttitle = PromptTitle()
+logger = logging.getLogger(__name__)
 
-async def new_chat(tenant_id: uuid.UUID, user_id: uuid.UUID, thread_id: uuid.UUID, input_prompt: str):
-    try:    
-        async with pool.acquire() as conn:
-            response = await conn.fetchrow(
-                titlequeries.FETCH_SESSION_TITLE,
-                thread_id,
-            ) 
-            
-            title = response["title"]
-            decrypted_title = await decrypt(title)
-            
-            if response is not None:
-                return {"status": "success", "content": "Already in database", "title": decrypted_title}
-            
-            thread_id = uuid.uuid4()
-            
-            SESSION_TITLE_SYSTEM_QUERY = prompttitle.SESSION_TITLE_SYSTEM_QUERY.format_map({
-                "input_prompt": input_prompt,
-            })
-            
-            title = gemini.ainvoke(SESSION_TITLE_SYSTEM_QUERY)
-            encrypted_title = await encrypt(title)
-            
-            await conn.execute(
-                titlequeries.INSERT_SESSION_TITLE,
-                thread_id, tenant_id, user_id, encrypted_title
-            )                 
-            
-            return {"status": "success", "content": f"Session created {title}", "title": title}
-    
-    except Exception as e:
-        print(e)
-        return {"status": "error", "content": str(e), "title": None}
-
-async def streaming(db_pool, input_data: dict, f: Optional[UploadFile] = None): 
+async def streaming(db_pool, input_data: ChatInput, f: Optional[UploadFile] = None): 
     # use get_stream_writer: https://reference.langchain.com/python/langgraph/config/get_stream_writer
     global pool
     pool = db_pool
+    lang_core.pool = pool
     
     builder = await get_agent()
     
-    thread_id = input_data["thread_id"]
-    user_id = input_data["user_id"]
-    tenant_id = input_data["tenant_id"]
-    input_prompt = input_data["input_prompt"]
-    mode = input_data["mode"]
-    
-    check_session = await new_chat(tenant_id, user_id, thread_id, input_prompt)
-    title = check_session["title"]
+    thread_id = input_data.thread_id
+    user_id = input_data.user_id
+    tenant_id = input_data.tenant_id
+    input_prompt = input_data.input_prompt
+    mode = input_data.mode
     
     config: RunnableConfig = {
         "configurable": {
@@ -80,6 +43,7 @@ async def streaming(db_pool, input_data: dict, f: Optional[UploadFile] = None):
     }
     
     if f is not None:
+        print("Upload file")
         result = await put_new_knowledge_session(pool, f, config, input_prompt)
         
         if result["s_knowledge_id"] != 0:
@@ -89,53 +53,70 @@ async def streaming(db_pool, input_data: dict, f: Optional[UploadFile] = None):
     else:
         result = None
     
-    async with AsyncPostgresSaver.from_conn_string(DB_URI) as checkpointer:
-        agent = builder.compile(checkpointer=checkpointer) # Don't forget use checkpointer
-        
-        if result is not None:
-            if result.get("metadata", None) is not None:
-                await agent.aupdate_state(
-                    config,
+    try:
+        async with AsyncPostgresSaver.from_conn_string(DB_URI) as checkpointer:
+            agent = builder.compile(checkpointer=checkpointer) # Don't forget use checkpointer
+            
+            if result is not None:
+                if result.get("metadata", None) is not None:
+                    async for chunk in agent.astream(
+                        {
+                            "tenant_id": str(tenant_id),
+                            "user_id": str(user_id),
+                            "thread_id": str(thread_id),
+                            "messages": [HumanMessage(content=input_prompt)],
+                            "mode": mode, 
+                            "streaming_mode": True,
+                            "retrieved_session_knowledge": {
+                                "append": [{result["s_knowledge_id"]: {"metadata": result["metadata"], "chunk_ids": result["chunk_ids"]}}],
+                            },
+                        },
+                        config,
+                        stream_mode="custom",
+                        version="v2",
+                    ):
+                        if chunk["type"] == "messages":
+                            msg, metadata = chunk["data"]
+                            if msg.content:
+                                yield msg.content 
+                                    
+                else:
+                    yield result
+            
+            else:
+                async for chunk in agent.astream(
                     {
-                        "retrieved_session_knowledge": {
-                            "append": [{result["s_knowledge_id"]: {"metadata": result["result"], "chunk_ids": result["chunk_ids"]}}]
-                        }
-                    }
-                )
-        
-        async for chunk in agent.astream(
-            {
-                "tenant_id": tenant_id,
-                "user_id": user_id,
-                "thread_id": thread_id,
-                "messages": [HumanMessage(content=input_prompt)],
-                "title": title,
-                "mode": mode, 
-                "streaming_mode": True,
-            },
-            config,
-            stream_mode="custom",
-            version="v2",
-        ):
-            if chunk["type"] == "messages":
-                msg, metadata = chunk["data"]
-                if msg.content:
-                    yield msg.content 
+                        "tenant_id": str(tenant_id),
+                        "user_id": str(user_id),
+                        "thread_id": str(thread_id),
+                        "messages": [HumanMessage(content=input_prompt)],
+                        "mode": mode, 
+                        "streaming_mode": True,
+                    },
+                    config,
+                    stream_mode="custom",
+                    version="v2",
+                ):
+                    if chunk["type"] == "messages":
+                        msg, metadata = chunk["data"]
+                        if msg.content:
+                            yield msg.content 
+    except Exception as e:
+        print(e)
+        yield {"status": "error", "content": str(e)}
 
 async def chat_workflow(db_pool, input_data: dict, f: Optional[UploadFile] = None):
     global pool
     pool = db_pool
+    lang_core.pool = pool
     
     builder = await get_agent()
     
-    thread_id = input_data["thread_id"]
-    user_id = input_data["user_id"]
-    tenant_id = input_data["tenant_id"]
-    input_prompt = input_data["input_prompt"]
-    mode = input_data["mode"]
-    
-    check_session = await new_chat(tenant_id, user_id, thread_id, input_prompt)
-    title = check_session["title"]
+    thread_id = input_data.thread_id
+    user_id = input_data.user_id
+    tenant_id = input_data.tenant_id
+    input_prompt = input_data.input_prompt
+    mode = input_data.mode
     
     config: RunnableConfig = {
         "configurable": {
@@ -146,44 +127,74 @@ async def chat_workflow(db_pool, input_data: dict, f: Optional[UploadFile] = Non
     }
     
     if f is not None:
+        print("Upload file")
         result = await put_new_knowledge_session(pool, f, config, input_prompt)
         
         if result["s_knowledge_id"] != 0:
             print("Success store new document")
         else:
             print("Error while store new document")
+            return {"status": "error", "content": result["content"]}
     else:
         result = None
     
-    async with AsyncPostgresSaver.from_conn_string(DB_URI) as checkpointer:
-        agent = builder.compile(checkpointer=checkpointer) # Don't forget use checkpointer
-        
-        if result is not None:
-            if result.get("metadata", None) is not None:
-                await agent.aupdate_state(
-                    config,
+    try:
+        async with AsyncPostgresSaver.from_conn_string(DB_URI) as checkpointer:
+            agent = builder.compile(checkpointer=checkpointer) # Don't forget use checkpointer
+            
+            if result is not None:
+                if result.get("metadata", None) is not None:
+                    result_agent = await agent.ainvoke(
+                        {
+                            "tenant_id": str(tenant_id),
+                            "user_id": str(user_id),
+                            "thread_id": str(thread_id),
+                            "messages": [HumanMessage(content=input_prompt)],
+                            "mode": mode, 
+                            "streaming_mode": False,
+                            "retrieved_session_knowledge": {
+                                "append": [{result["s_knowledge_id"]: {"metadata": result["metadata"], "chunk_ids": result["chunk_ids"]}}],
+                            },
+                        },
+                        config,
+                    )
+                    
+                    try:
+                        text = message_to_dict(result_agent["messages"][-1])["data"]["content"][0]["text"]
+                    except Exception as e:
+                        print(e)
+                        text = message_to_dict(result_agent["messages"][-1])
+                    
+                    return {"thread_id": str(thread_id), "content": text}
+                        
+                else:
+                    return result
+                    
+            else:
+                result_agent = await agent.ainvoke(
                     {
-                        "retrieved_session_knowledge": {
-                            "append": [{result["s_knowledge_id"]: {"metadata": result["result"], "chunk_ids": result["chunk_ids"]}}]
-                        }
-                    }
+                        "tenant_id": str(tenant_id),
+                        "user_id": str(user_id),
+                        "thread_id": str(thread_id),
+                        "messages": [HumanMessage(content=input_prompt)],
+                        "mode": mode, 
+                        "streaming_mode": False,
+                    },
+                    config,
                 )
                 
-        result = agent.ainvoke(
-            {
-                "tenant_id": tenant_id,
-                "user_id": user_id,
-                "thread_id": thread_id,
-                "messages": [HumanMessage(content=input_prompt)],
-                "title": title,
-                "mode": mode, 
-                "streaming_mode": False,
-            },
-            config,
-        )
-        
-    return message_to_dict(result["message"][-1])
+                try:
+                    text = message_to_dict(result_agent["messages"][-1])["data"]["content"][0]["text"]
+                except Exception as e:
+                    print(e)
+                    text = message_to_dict(result_agent["messages"][-1])
 
+                return {"thread_id": str(thread_id), "content": text}
+    except Exception as e:
+        logger.error(traceback.format_exc())
+        print(e)
+        return {"status": "error", "content": str(e)}
+                
 async def get_agent_graph():
     builder = await get_agent()
     

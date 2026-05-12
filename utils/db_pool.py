@@ -2,6 +2,7 @@ import asyncpg, asyncio
 import os
 from dotenv import load_dotenv
 from fastapi import HTTPException
+from pgvector.asyncpg import register_vector
 
 load_dotenv()
 
@@ -16,12 +17,21 @@ async def init_db_pool():
         async with _db_pool_lock:
             if _db_pool is not None:
                 return
+                
+            async def init_conn(conn):
+                    await register_vector(conn)
+              
             _db_pool = await asyncpg.create_pool(
                 dsn=database_url,
                 min_size=2,
                 max_size=10,
                 max_inactive_connection_lifetime=500,
+                init=init_conn,
             )
+            
+        # async with _db_pool.acquire() as conn:
+            # await register_vector(conn)
+            
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Error in init_db_pool: {e}")
         

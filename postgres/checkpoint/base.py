@@ -1,7 +1,8 @@
 from __future__ import annotations
 
 import random
-import warnings
+import warnings, uuid
+from langchain_core.messages import message_to_dict, AIMessage, ToolMessage, HumanMessage, SystemMessage, BaseMessage, messages_from_dict
 from collections.abc import Sequence
 from importlib.metadata import version as get_version
 from typing import Any, cast
@@ -43,21 +44,21 @@ select
     (
         select array_agg(array[bl.channel::bytea, bl.type::bytea, bl.blob])
         from jsonb_each_text(checkpoint -> 'channel_versions')
-        inner join Session_blobs bl
-            on bl.thread_id = Session_checkpoints.thread_id
-            and bl.checkpoint_ns = Session_checkpoints.checkpoint_ns
+        inner join "Session_blobs" bl
+            on bl.thread_id = "Session_checkpoints".thread_id
+            and bl.checkpoint_ns = "Session_checkpoints".checkpoint_ns
             and bl.channel = jsonb_each_text.key
             and bl.version = jsonb_each_text.value
     ) as channel_values,
     (
         select
         array_agg(array[cw.task_id::text::bytea, cw.channel::bytea, cw.type::bytea, cw.blob] order by cw.task_id, cw.idx)
-        from Session_checkpoint_writes cw
-        where cw.thread_id = Session_checkpoints.thread_id
-            and cw.checkpoint_ns = Session_checkpoints.checkpoint_ns
-            and cw.checkpoint_id = Session_checkpoints.checkpoint_id
+        from "Session_checkpoint_writes" cw
+        where cw.thread_id = "Session_checkpoints".thread_id
+            and cw.checkpoint_ns = "Session_checkpoints".checkpoint_ns
+            and cw.checkpoint_id = "Session_checkpoints".checkpoint_id
     ) as pending_writes
-from Session_checkpoints """
+from "Session_checkpoints" """
 
 SELECT_PENDING_SENDS_SQL = f"""
 select
@@ -65,7 +66,7 @@ select
     user_id,
     checkpoint_id,
     array_agg(array[type::bytea, blob] order by task_path, task_id, idx) as sends
-from Session_checkpoint_writes
+from "Session_checkpoint_writes"
 where thread_id = %s
     and checkpoint_id = any(%s)
     and channel = '{TASKS}'
@@ -73,13 +74,13 @@ group by checkpoint_id
 """
 
 UPSERT_CHECKPOINT_BLOBS_SQL = """
-    INSERT INTO Session_blobs (tenant_id, user_id, thread_id, checkpoint_ns, channel, version, type, checkpoint_blob)
+    INSERT INTO "Session_blobs" (tenant_id, user_id, thread_id, checkpoint_ns, channel, version, type, blob)
     VALUES (%s, %s, %s, %s, %s, %s, %s, %s)
     ON CONFLICT (thread_id, checkpoint_ns, channel, version) DO NOTHING
 """
 
 UPSERT_CHECKPOINTS_SQL = """
-    INSERT INTO Session_checkpoints (tenant_id, user_id, thread_id, checkpoint_ns, checkpoint_id, parent_checkpoint_id, checkpoint, metadata)
+    INSERT INTO "Session_checkpoints" (tenant_id, user_id, thread_id, checkpoint_ns, checkpoint_id, parent_checkpoint_id, checkpoint, metadata)
     VALUES (%s, %s, %s, %s, %s, %s, %s, %s)
     ON CONFLICT (thread_id, checkpoint_ns, checkpoint_id)
     DO UPDATE SET
@@ -88,7 +89,7 @@ UPSERT_CHECKPOINTS_SQL = """
 """
 
 UPSERT_CHECKPOINT_WRITES_SQL = """
-    INSERT INTO Session_checkpoint_writes (tenant_id, user_id, thread_id, checkpoint_ns, checkpoint_id, task_id, task_path, idx, channel, type, blob)
+    INSERT INTO "Session_checkpoint_writes" (tenant_id, user_id, thread_id, checkpoint_ns, checkpoint_id, task_id, task_path, idx, channel, type, blob)
     VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
     ON CONFLICT (thread_id, checkpoint_ns, checkpoint_id, task_id, idx) DO UPDATE SET
         channel = EXCLUDED.channel,
@@ -97,11 +98,38 @@ UPSERT_CHECKPOINT_WRITES_SQL = """
 """
 
 INSERT_CHECKPOINT_WRITES_SQL = """
-    INSERT INTO Session_checkpoint_writes (tenant_id, user_id, thread_id, checkpoint_ns, checkpoint_id, task_id, task_path, idx, channel, type, blob)
+    INSERT INTO "Session_checkpoint_writes" (tenant_id, user_id, thread_id, checkpoint_ns, checkpoint_id, task_id, task_path, idx, channel, type, blob)
     VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
     ON CONFLICT (thread_id, checkpoint_ns, checkpoint_id, task_id, idx) DO NOTHING
 """
 
+def convert_message_to_dict(obj):
+    if isinstance(obj, BaseMessage):
+        return message_to_dict(obj)
+    if isinstance(obj, list):
+        return [convert_message_to_dict(i) for i in obj]
+    
+    return obj
+
+def convert_uuid_keys(obj):
+    if isinstance(obj, dict):
+        return {str(k) if isinstance(k, uuid.UUID) else k: convert_uuid_keys(v) for k, v in obj.items()}
+    elif isinstance(obj, list):
+        return [convert_uuid_keys(i) for i in obj]
+    return obj
+
+def restore_uuid_keys(obj):
+    if isinstance(obj, dict):
+        restored = {}
+        for k, v in obj.items():
+            try:
+                restored[uuid.UUID(k)] = restore_uuid_keys(v)
+            except (ValueError, AttributeError):
+                restored[k] = restore_uuid_keys(v)
+        return restored
+    elif isinstance(obj, list):
+        return [restore_uuid_keys(i) for i in obj]
+    return obj
 
 class BasePostgresSaver(BaseCheckpointSaver[str]):
     SELECT_SQL = SELECT_SQL
@@ -136,13 +164,39 @@ class BasePostgresSaver(BaseCheckpointSaver[str]):
     def _load_blobs(
         self, blob_values: list[tuple[bytes, bytes, bytes]]
     ) -> dict[str, Any]:
+        # print("masuk _load_blobs")
         if not blob_values:
             return {}
-        return {
-            k.decode(): self.serde.loads_typed((t.decode(), v))
-            for k, t, v in blob_values
-            if t.decode() != "empty"
-        }
+            
+        result = {}
+        for k, t, v in blob_values:
+            key = k.decode()
+            type_ = t.decode()
+            
+            if type_ == "empty":
+                continue
+            
+            data_k = self.serde.loads_typed((type_, v))
+            
+            if key == "messages":
+                if isinstance(data_k, dict):
+                    try:
+                        data_k = messages_from_dict([data_k])[0]
+                    except Exception:
+                        pass
+                elif isinstance(data_k, list):
+                    try:
+                        data_k = data_k = messages_from_dict(data_k)
+                    except Exception:
+                        pass
+                    
+            result[key] = data_k
+            
+        return result  #{
+            # k.decode(): self.serde.loads_typed((t.decode(), v))
+            # for k, t, v in blob_values
+            # if t.decode() != "empty"
+        # }
 
     def _dump_blobs(
         self,
@@ -153,29 +207,55 @@ class BasePostgresSaver(BaseCheckpointSaver[str]):
         values: dict[str, Any],
         versions: ChannelVersions,
     ) -> list[tuple[str, str, str, str, str, bytes | None]]:
+        # print("masuk _dump_blobs")
         if not versions:
             return []
-
-        return [
-            (
-                tenant_id,
-                user_id,
-                thread_id,
-                checkpoint_ns,
-                k,
-                cast(str, ver),
-                *(
-                    self.serde.dumps_typed(values[k])
-                    if k in values
-                    else ("empty", None)
-                ),
+            
+        result = []
+        for k, ver in versions.items():
+            if k in values:
+                data_k = convert_message_to_dict(values[k])
+                type_, blob = self.serde.dumps_typed(
+                    data_k #convert_message_to_dict(values[k])
+                )
+            else:
+                type_, blob = ("empty", None)
+                
+            result.append(
+                (
+                    tenant_id,
+                    user_id,
+                    thread_id,
+                    checkpoint_ns,
+                    k,
+                    cast(str, ver),
+                    type_,
+                    blob,
+                )
             )
-            for k, ver in versions.items()
-        ]
+                
+        
+        return result #[
+            # (
+                # tenant_id,
+                # user_id,
+                # thread_id,
+                # checkpoint_ns,
+                # k,
+                # cast(str, ver),
+                # *(
+                    # self.serde.dumps_typed(convert_message_to_dict(values[k]))
+                    # if k in values
+                    # else ("empty", None)
+                # ),
+            # )
+            # for k, ver in versions.items()
+        # ]
 
     def _load_writes(
         self, writes: list[tuple[bytes, bytes, bytes, bytes]]
     ) -> list[tuple[str, str, Any]]:
+        # print("masuk _load_writes")
         return (
             [
                 (
@@ -200,6 +280,7 @@ class BasePostgresSaver(BaseCheckpointSaver[str]):
         task_path: str,
         writes: Sequence[tuple[str, Any]],
     ) -> list[tuple[str, str, str, str, str, int, str, str, bytes]]:
+        # print("masuk _dump_writes")
         return [
             (
                 tenant_id,

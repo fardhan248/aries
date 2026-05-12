@@ -50,7 +50,6 @@ class Prompts:
 
     THINKING_SYSTEM_QUERY = """
     You are a routing agent. Your job is to classify the latest user message into exactly one route.
-
     Respond with ONLY the route name. No explanation, no punctuation — just the route name.
 
     Available routes:
@@ -60,17 +59,19 @@ class Prompts:
     Rules:
     - If the task involves code → choose coding_react (never thinking_react).
     - Base your decision on the latest message. Use history only to resolve ambiguity (e.g., if the latest message refers to a previous topic).
+    - Mode is ABSOLUTE: you are in thinking mode, so always choose from the routes above — even if the question seems simple or conversational. Never fall back to basic or fast routes.
 
     History messages:
     {trimmed_msg_thinking}
-
     Latest message:
     {latest_message}
+
+    mode:
+    {format_mode}
     """
 
     FAST_SYSTEM_QUERY = """
     You are a routing agent. Your job is to classify the latest user message into exactly one route.
-
     Respond with ONLY the route name. No explanation, no punctuation — just the route name.
 
     Available routes:
@@ -80,12 +81,15 @@ class Prompts:
     Rules:
     - If the task involves code → choose coding_basic (never basic).
     - Base your decision on the latest message. Use history only to resolve ambiguity (e.g., if the latest message refers to a previous topic).
+    - Mode is ABSOLUTE: you are in fast mode, so always choose from the routes above — even if the question is complex or demands deep reasoning. Never escalate to thinking or reasoning routes.
 
     History messages:
     {trimmed_msg_fast}
-
     Latest message:
-    {latest_message]}
+    {latest_message}
+
+    mode:
+    {format_mode}
     """
 
     # ====================

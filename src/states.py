@@ -1,6 +1,7 @@
-from langchain.messages import AnyMessage
+from langchain_core.messages import BaseMessage
+from langgraph.graph.message import add_messages
 
-import copy, operator
+import copy, operator, uuid
 from typing_extensions import TypedDict, Annotated, Literal, Any
 from pydantic import BaseModel, Field
 
@@ -36,14 +37,13 @@ def items_reducer(current: list, new: dict):
     return result    
 
 class State(TypedDict):
-    tenant_id: str
-    user_id: str
-    session_id: str # thread_id
-    title: str
+    tenant_id: str #uuid.UUID
+    user_id: str #uuid.UUID
+    thread_id: str #uuid.UUID # thread_id
     mode: Literal["auto", "thinking", "fast"] = "auto" # auto, thinking (reasoning), fast (no reasoning)
-    streaming_mode: bool = True
+    streaming_mode: bool = False
 
-    messages: Annotated[list[AnyMessage], operator.add] = [] # list of AnyMessage, Human, AI, Tool, System
+    messages: Annotated[list[BaseMessage], add_messages] = [] # list of AnyMessage, Human, AI, Tool, System
     selected_knowledge: Annotated[list[dict], items_reducer] = [] # list of dict: [{knowledge_id: {"metadata": metadata, "chunk_ids": [id_1, id_2]}}]
     chunk_knowledge: Annotated[list[dict], items_reducer] = [] # list of dict: [{chunk_id: content, "knowledge_id": knowledge_id}]
     retrieved_session_knowledge: Annotated[list[dict], items_reducer] = [] # list of dict: [{s_knowledge_id: {"metadata": metadata, "chunk_ids": [id_1, id_2]}}]
@@ -51,7 +51,7 @@ class State(TypedDict):
     memory_ids: Annotated[list, items_reducer] = [] # list of str: [memory_id]
     memory: Annotated[list[dict], items_reducer] = [] # list of dict: [{memory_id: content}]
     
-    last_query: str
+    last_query: str = ""
     iteration: int = 0 # For reasoning iteration
     route: Literal["basic", "coding_basic", "coding_react", "thinking_react"] # basic, coding-basic, coding-reasoning, thinking-reasoning. 
                                                                               # router akan memilih antara [basic, coding_basic, coding_react, thinking_react]
