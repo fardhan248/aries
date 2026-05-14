@@ -2,7 +2,7 @@ from postgres.checkpoint.aio import AsyncPostgresSaver
 from langchain_core.messages import HumanMessage, message_to_dict
 from langchain_core.runnables import RunnableConfig
 
-import os, uuid, logging, traceback
+import os, uuid, logging, traceback, json
 from models.gemini import gemini
 from utils.documents_utils import put_new_knowledge_session
 from fastapi import UploadFile
@@ -75,10 +75,9 @@ async def streaming(db_pool, input_data: ChatInput, f: Optional[UploadFile] = No
                         stream_mode="custom",
                         version="v2",
                     ):
-                        if chunk["type"] == "messages":
-                            msg, metadata = chunk["data"]
-                            if msg.content:
-                                yield msg.content 
+                        if chunk["type"] == "custom":
+                            data = json.dumps({"type": "token", "content": chunk["data"]["token"]})
+                            yield f"data: {data}\n\n"
                                     
                 else:
                     yield result
@@ -97,11 +96,15 @@ async def streaming(db_pool, input_data: ChatInput, f: Optional[UploadFile] = No
                     stream_mode="custom",
                     version="v2",
                 ):
-                    if chunk["type"] == "messages":
-                        msg, metadata = chunk["data"]
-                        if msg.content:
-                            yield msg.content 
+                    if chunk["type"] == "custom":
+                        data = json.dumps({"type": "token", "content": chunk["data"]["token"]})
+                            yield f"data: {data}\n\n"
+                            
+            
+            yield f"data: {json.dumps({'type': 'done'})}\n\n"
+            
     except Exception as e:
+        logger.error(traceback.format_exc())
         print(e)
         yield {"status": "error", "content": str(e)}
 
