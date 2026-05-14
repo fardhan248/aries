@@ -64,43 +64,6 @@ async def make_new_chat(
             input_data=input_data.model_dump_json(),
             f=f2,
         )
-    
-    # if input_data.streaming == False:
-        # return chat(
-            # request=request,
-            # thread_id=thread_id,
-            # input_data=input_data.model_dump_json(),
-            # f=f2,
-        # )
-    # else:
-        # return stream_chat(
-            # request=request,
-            # thread_id=thread_id,
-            # input_data=input_data.model_dump_json(),
-            # f=f2,
-        # )
-
-# @router.post("/chat/stream_chat/{thread_id}")
-# async def stream_chat(
-    # request: Request, 
-    # thread_id: uuid.UUID, 
-    # input_data: str = Form(...), 
-    # f: Optional[UploadFile] = File(None),
-# ):
-    # pool = request.app.state.pool
-    
-    # input_data = ChatInput(**json.loads(input_data))
-    
-    # if f:
-        # return StreamingResponse(
-            # streaming(pool, input_data, f), 
-            # media_type="text/plain",
-        # )
-    # else:
-        # return StreamingResponse(
-            # streaming(pool, input_data), 
-            # media_type="text/plain",
-        # )
 
 @router.post("/chat/{thread_id}") #✅
 async def chat(
@@ -118,23 +81,18 @@ async def chat(
         input_data.thread_id = thread_id
     
     if streaming == False:
-        if f:
-            return await chat_workflow(pool, input_data, f)
-        else:
-            return await chat_workflow(pool, input_data)
+        return await chat_workflow(pool, input_data, f)
     
     else:
-        if f:
-            return StreamingResponse(
-                streaming(pool, input_data, f), 
-                media_type="text/plain",
-            )
-        else:
-            return StreamingResponse(
-                streaming(pool, input_data), 
-                media_type="text/plain",
-            )
-  
+        return StreamingResponse(
+            streaming(pool, input_data, f), 
+            media_type="text/event_stream",
+            headers={
+                "Cache-Control": "no-cache",
+                "Connection": "keep-alive",
+            }
+        )
+
     
 @router.post("/add_member/add_company") #✅
 async def add_company(request: Request, tenant: str = Body(...)):
@@ -164,10 +122,10 @@ async def upload(request: Request, tenant_id: uuid.UUID, f: UploadFile):
     return await put_new_knowledge(pool, f, tenant_id)
 
 
-@router.get("/get_graph") #✅
-async def get_graph():
-    await get_agent_graph()
-    return {"status": "success"}
+# @router.get("/get_graph") #✅
+# async def get_graph():
+    # await get_agent_graph()
+    # return {"status": "success"}
     
 
 @router.get("/health") #✅
