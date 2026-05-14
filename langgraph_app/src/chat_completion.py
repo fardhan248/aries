@@ -3,7 +3,6 @@ from langchain_core.messages import HumanMessage, message_to_dict
 from langchain_core.runnables import RunnableConfig
 
 import os, uuid, logging, traceback, json
-from models.gemini import gemini
 from utils.documents_utils import put_new_knowledge_session
 from fastapi import UploadFile
 from src.langgraph_core import get_agent
@@ -108,7 +107,7 @@ async def streaming(db_pool, input_data: ChatInput, f: Optional[UploadFile] = No
         print(e)
         yield {"status": "error", "content": str(e)}
 
-async def chat_workflow(db_pool, input_data: dict, f: Optional[UploadFile] = None):
+async def chat_workflow(db_pool, input_data: ChatInput, f: Optional[UploadFile] = None):
     global pool
     pool = db_pool
     lang_core.pool = pool
