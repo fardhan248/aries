@@ -19,7 +19,7 @@ pool = None
 
 logger = logging.getLogger(__name__)
 
-async def streaming(db_pool, input_data: ChatInput, f: Optional[UploadFile] = None): 
+async def streaming(db_pool, chroma, input_data: ChatInput, f: Optional[UploadFile] = None): 
     # use get_stream_writer: https://reference.langchain.com/python/langgraph/config/get_stream_writer
     global pool
     pool = db_pool
@@ -43,7 +43,7 @@ async def streaming(db_pool, input_data: ChatInput, f: Optional[UploadFile] = No
     
     if f is not None:
         print("Upload file")
-        result = await put_new_knowledge_session(pool, f, config, input_prompt)
+        result = await put_new_knowledge_session(chroma, f, config)
         
         if result["s_knowledge_id"] != 0:
             print("Success store new document")
@@ -107,7 +107,7 @@ async def streaming(db_pool, input_data: ChatInput, f: Optional[UploadFile] = No
         print(e)
         yield {"status": "error", "content": str(e)}
 
-async def chat_workflow(db_pool, input_data: ChatInput, f: Optional[UploadFile] = None):
+async def chat_workflow(db_pool, chroma, input_data: ChatInput, f: Optional[UploadFile] = None):
     global pool
     pool = db_pool
     lang_core.pool = pool
@@ -130,7 +130,7 @@ async def chat_workflow(db_pool, input_data: ChatInput, f: Optional[UploadFile] 
     
     if f is not None:
         print("Upload file")
-        result = await put_new_knowledge_session(pool, f, config, input_prompt)
+        result = await put_new_knowledge_session(chroma, f, config)
         
         if result["s_knowledge_id"] != 0:
             print("Success store new document")

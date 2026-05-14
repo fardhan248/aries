@@ -62,12 +62,12 @@ services:
         image: chromadb/chroma:latest
         container_name: chromadb
         ports:
-            - "8080:8080"
+            - "8000:8000"
         environment:
             ANONYMIZED_TELEMETRY: "FALSE"
             IS_PERSISTENT: "TRUE"
             PERSIST_DIRECTORY: "/chroma/chroma"
-            CHROMA_SERVER_HTTP_PORT: "8080"
+            CHROMA_SERVER_HTTP_PORT: "8000"
         volumes:
             - chroma_data:/chroma/chroma
         restart: no

@@ -6,7 +6,7 @@ from contextlib import asynccontextmanager
 from supabase import acreate_client
 from dotenv import load_dotenv
 import utils.contextmanager_utils as cm
-import os
+import os, chromadb
 
 load_dotenv()
 
@@ -19,6 +19,7 @@ async def lifespan(app: FastAPI):
     cm.supabase_client = await acreate_client(supabase_url, supabase_key)
     
     app.state.pool = await get_db_pool()
+    app.state.chroma = chromadb.HttpClient(host="chromadb", port=8000)
     yield
     await close_db_pool()
     
