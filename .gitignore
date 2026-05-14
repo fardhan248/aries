@@ -1,4 +1,6 @@
 .env
 key.txt
+.git
 
 __pycache__/
+*.pyc

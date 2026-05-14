@@ -1,0 +1,22 @@
+services:
+    ollama_llm:
+        image:
+        container_name: ollama_llm
+        ports:
+            - "8080:8080"
+        volumes:
+            - ./models:/
+        command:
+        restart: no
+    
+    langgraph:
+        build: 
+        container_name: langgraph
+        ports:
+            - "8000:8000"
+        depends_on:
+            - ollama_llm
+        volumes:
+            - ./langgraph_app:/main_app
+        command:
+        restart: no
