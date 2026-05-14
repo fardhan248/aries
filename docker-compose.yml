@@ -6,6 +6,8 @@ services:
             - "11434:11434"
         volumes:
             - ./model_files:/model_files
+        environment:
+            - OLLAMA_HOST=0.0.0.0:11434
         deploy:
             resources:
                 reservations:
@@ -21,9 +23,11 @@ services:
         image: ollama/ollama:latest
         container_name: ollama_embedding
         ports:
-            - "11435:11435"
+            - "11434:11434"
         volumes:
             - ./model_files:/model_files
+        environment:
+            - OLLAMA_HOST=0.0.0.0:11434
         deploy:
             resources:
                 reservations:
@@ -37,6 +41,8 @@ services:
     
     langgraph:
         build: 
+            context: .
+            dockerfile: Dockerfile
         container_name: langgraph
         ports:
             - "8000:8000"
@@ -49,5 +55,22 @@ services:
             - .env
         volumes:
             - ./langgraph_app:/main_app
-        command: uvicorn main_app:app --host 0.0.0.0 --post 8000
+        command: uvicorn main_app:app --host 0.0.0.0 --port 8000
         restart: no
+        
+    chromadb:
+        image: chromadb/chroma:latest
+        container_name: chromadb
+        ports:
+            - "8080:8080"
+        environment:
+            ANONYMIZED_TELEMETRY: "FALSE"
+            IS_PERSISTENT: "TRUE"
+            PERSIST_DIRECTORY: "/chroma/chroma"
+            CHROMA_SERVER_HTTP_PORT: "8080"
+        volumes:
+            - chroma_data:/chroma/chroma
+        restart: no
+        
+volumes: 
+    chroma_data:
