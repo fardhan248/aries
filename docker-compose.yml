@@ -1,12 +1,38 @@
 services:
     ollama_llm:
-        image:
+        image: ollama/ollama:latest
         container_name: ollama_llm
         ports:
-            - "8080:8080"
+            - "11434:11434"
         volumes:
-            - ./models:/
-        command:
+            - ./model_files:/model_files
+        deploy:
+            resources:
+                reservations:
+                    devices:
+                        - driver: nvidia
+                          count: all
+                          capabilities: [gpu]
+        tty: true
+        entrypoint: ["/bin/sh", "model_files/run_ollama.sh"]
+        restart: no
+        
+    ollama_embedding:
+        image: ollama/ollama:latest
+        container_name: ollama_embedding
+        ports:
+            - "11435:11435"
+        volumes:
+            - ./model_files:/model_files
+        deploy:
+            resources:
+                reservations:
+                    devices:
+                        - driver: nvidia
+                          count: all
+                          capabilities: [gpu]
+        tty: true
+        entrypoint: ["/bin/sh", "model_files/run_ollama_embedding.sh"]
         restart: no
     
     langgraph:
@@ -15,8 +41,13 @@ services:
         ports:
             - "8000:8000"
         depends_on:
-            - ollama_llm
+            ollama_llm:
+                condition: service_started
+            ollama_embedding:
+                condition: service_started
+        env_file:
+            - .env
         volumes:
             - ./langgraph_app:/main_app
-        command:
+        command: uvicorn main_app:app --host 0.0.0.0 --post 8000
         restart: no
