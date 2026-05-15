@@ -5,6 +5,7 @@ from langchain_text_splitters import RecursiveCharacterTextSplitter
 from models.ollama_qwen import ollama_embedding
 from langchain_chroma import Chroma
 from langchain_core.documents import Document
+from datetime import datetime, timedelta
 
 load_dotenv()
 
@@ -16,6 +17,33 @@ splitter = RecursiveCharacterTextSplitter(
     chunk_size=500,
     chunk_overlap=50,
 )
+
+
+async def get_vector_store_chroma(collection: str):
+    return Chroma(
+        client=chroma,
+        collection_name=collection,
+        embedding_function=ollama_embedding,
+        collection_metadata={"hnsw:space": "cosine"},
+    )
+    
+async def get_vector_store_retriever(chroma_vector_store, search_filter: dict = None):
+    search_kwargs = {"k": 5}
+    
+    if search_filter:
+        search_kwargs["filter"] = search_filter
+    
+    return chroma_db.as_retriever(
+        search_type="similarity",
+        search_kwargs=search_kwargs,
+    )
+     
+async def str_to_datetime(date: str):
+    try:
+        dt = datetime.strptime(date, "%Y-%m-%d %H:%M:%S.%f")
+    except Exception:
+        dt = datetime.strptime(date, "%Y-%m-%d %H:%M:%S")
+
 
 async def encrypt(text: str) -> bytes:
     if not isinstance(text, str):
@@ -82,6 +110,7 @@ async def chunk_document(filename, content_type, file_bytes, configurable):
             "thread_id": thread_id,
             "knowledge_id": knowledge_id,
             "chunk_id": str(uuid.uuid4()),
+            "created_at": str(datetime.now()),
         }
         for _ in range(len(chunks))
     ]
@@ -90,6 +119,12 @@ async def chunk_document(filename, content_type, file_bytes, configurable):
  
 ## Upload user_document per chat, add TTL
 async def save_chunks_session_to_db(chunks, metadatas):
+    for i in range(len(metadatas)):
+        created_at = str_to_datetime(metadatas[i]["created_at"])
+        metadatas[i]["expired_at"] = str(created_at + timedelta(days=7))
+        
+    metadatas = [x[] for x in metadatas]
+    
     thread_id = metadatas[0]["thread_id"]
     s_knowledge_id = metadatas[0]["knowledge_id"]
     
@@ -105,12 +140,7 @@ async def save_chunks_session_to_db(chunks, metadatas):
     uuids = [x["chunk_id"] for x in metadatas]
     
     try:
-        vector_store = Chroma(
-            client=chroma,
-            collection_name=f"thread_{thread_id.replace('-', '_')}",
-            embedding_function=ollama_embedding,
-            collection_metadata={"hnsw:space": "cosine"},
-        )
+        vector_store = get_vector_store_chroma(f"thread_{thread_id.replace('-', '_')}")
         
         await vector_store.aadd_documents(documents=documents, ids=uuids)
 
@@ -160,12 +190,7 @@ async def save_chunks_to_db(chunks, metadatas):
     uuids = [x["chunk_id"] for x in metadatas]
     
     try:
-        vector_store = Chroma(
-            client=chroma,
-            collection_name=f"tenant_{tenant_id.replace('-', '_')}",
-            embedding_function=ollama_embedding,
-            collection_metadata={"hnsw:space": "cosine"},
-        )
+        vector_store = get_vector_store_chroma(f"tenant_{tenant_id.replace('-', '_')}")
         
         await vector_store.aadd_documents(documents=documents, ids=uuids)
 
