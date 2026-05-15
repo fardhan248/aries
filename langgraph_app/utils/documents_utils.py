@@ -33,7 +33,7 @@ async def get_vector_store_retriever(chroma_vector_store, search_filter: dict = 
     if search_filter:
         search_kwargs["filter"] = search_filter
     
-    return chroma_db.as_retriever(
+    return chroma_vector_store.as_retriever(
         search_type="similarity",
         search_kwargs=search_kwargs,
     )
@@ -105,6 +105,7 @@ async def chunk_document(filename, content_type, file_bytes, configurable):
             "content_type": content_type,
             "len_pages": len_doc,
             "number_chunks": len(chunks),
+            "len_char": len(chunk),
             "tenant_id": tenant_id,
             "user_id": user_id,
             "thread_id": thread_id,
@@ -112,7 +113,7 @@ async def chunk_document(filename, content_type, file_bytes, configurable):
             "chunk_id": str(uuid.uuid4()),
             "created_at": str(datetime.now()),
         }
-        for _ in range(len(chunks))
+        for chunk in chunks
     ]
         
     return chunks, metadatas
@@ -140,7 +141,7 @@ async def save_chunks_session_to_db(chunks, metadatas):
     uuids = [x["chunk_id"] for x in metadatas]
     
     try:
-        vector_store = get_vector_store_chroma(f"thread_{thread_id.replace('-', '_')}")
+        vector_store = await get_vector_store_chroma(f"thread_{thread_id.replace('-', '_')}")
         
         await vector_store.aadd_documents(documents=documents, ids=uuids)
 
@@ -190,7 +191,7 @@ async def save_chunks_to_db(chunks, metadatas):
     uuids = [x["chunk_id"] for x in metadatas]
     
     try:
-        vector_store = get_vector_store_chroma(f"tenant_{tenant_id.replace('-', '_')}")
+        vector_store = await get_vector_store_chroma(f"tenant_{tenant_id.replace('-', '_')}")
         
         await vector_store.aadd_documents(documents=documents, ids=uuids)
 
