@@ -2,12 +2,13 @@ services:
     ollama_llm:
         image: ollama/ollama:latest
         container_name: ollama_llm
-        ports:
-            - "11434:11434"
+        # ports:
+            # - "11434:11434"
         volumes:
             - ./model_files:/model_files
         environment:
             - OLLAMA_HOST=0.0.0.0:11434
+            - OLLAMA_KEEP_ALIVE=-1
         deploy:
             resources:
                 reservations:
@@ -22,12 +23,13 @@ services:
     ollama_embedding:
         image: ollama/ollama:latest
         container_name: ollama_embedding
-        ports:
-            - "11434:11434"
+        # ports:
+            # - "11434:11434"
         volumes:
             - ./model_files:/model_files
         environment:
             - OLLAMA_HOST=0.0.0.0:11434
+            - OLLAMA_KEEP_ALIVE=-1
         deploy:
             resources:
                 reservations:
@@ -54,7 +56,7 @@ services:
         env_file:
             - .env
         volumes:
-            - ./langgraph_app:/main_app
+            - ./langgraph_app:/app
         command: uvicorn main_app:app --host 0.0.0.0 --port 8000
         restart: no
         
@@ -62,7 +64,7 @@ services:
         image: chromadb/chroma:latest
         container_name: chromadb
         ports:
-            - "8000:8000"
+            - "8001:8000"
         environment:
             ANONYMIZED_TELEMETRY: "FALSE"
             IS_PERSISTENT: "TRUE"

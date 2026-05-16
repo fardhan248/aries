@@ -6,13 +6,13 @@ from models.ollama_qwen import ollama_embedding
 from langchain_chroma import Chroma
 from langchain_core.documents import Document
 from datetime import datetime, timedelta
+from utils.contextmanager_utils import chroma
 
 load_dotenv()
 
 ENC_KEY = base64.b64decode(os.getenv("KEY"))
 aesccm = AESCCM(ENC_KEY)
 
-chroma = None
 splitter = RecursiveCharacterTextSplitter(
     chunk_size=500,
     chunk_overlap=50,
@@ -123,8 +123,6 @@ async def save_chunks_session_to_db(chunks, metadatas):
     for i in range(len(metadatas)):
         created_at = str_to_datetime(metadatas[i]["created_at"])
         metadatas[i]["expired_at"] = str(created_at + timedelta(days=7))
-        
-    metadatas = [x[] for x in metadatas]
     
     thread_id = metadatas[0]["thread_id"]
     s_knowledge_id = metadatas[0]["knowledge_id"]
@@ -151,10 +149,7 @@ async def save_chunks_session_to_db(chunks, metadatas):
         
     return {"status": "success", "s_knowledge_id": s_knowledge_id, "thread_id": thread_id, "chunk_ids": uuids, "metadata": metadatas}
 
-async def put_new_knowledge_session(chroma_db, f, config):
-    global chroma
-    chroma = chroma_db
-    
+async def put_new_knowledge_session(f, config):    
     filename = f.filename
     content_type = f.content_type
     file_bytes = await f.read()
@@ -201,10 +196,7 @@ async def save_chunks_to_db(chunks, metadatas):
         
     return {"status": "success", "knowledge_id": knowledge_id, "tenant_id": tenant_id, "chunk_ids": uuids, "metadata": metadatas}
     
-async def put_new_knowledge(chroma_db, f, tenant_id):
-    global chroma_db
-    chroma = chroma_db
-    
+async def put_new_knowledge(f, tenant_id):    
     filename = f.filename
     content_type = f.content_type
     file_bytes = await f.read()

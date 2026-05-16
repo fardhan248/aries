@@ -17,9 +17,9 @@ supabase_url = os.getenv("SUPABASE_URL")
 async def lifespan(app: FastAPI):
     global supabase_client
     cm.supabase_client = await acreate_client(supabase_url, supabase_key)
+    cm.chroma = chromadb.HttpClient(host="chromadb", port=8000)
     
     app.state.pool = await get_db_pool()
-    app.state.chroma = chromadb.HttpClient(host="chromadb", port=8000)
     yield
     await close_db_pool()
     

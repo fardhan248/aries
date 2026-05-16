@@ -19,7 +19,7 @@ pool = None
 
 logger = logging.getLogger(__name__)
 
-async def streaming(db_pool, chroma, input_data: ChatInput, f: Optional[UploadFile] = None): 
+async def streaming(db_pool, input_data: ChatInput, f: Optional[UploadFile] = None): 
     # use get_stream_writer: https://reference.langchain.com/python/langgraph/config/get_stream_writer
     global pool
     pool = db_pool
@@ -43,7 +43,7 @@ async def streaming(db_pool, chroma, input_data: ChatInput, f: Optional[UploadFi
     
     if f is not None:
         print("Upload file")
-        result = await put_new_knowledge_session(chroma, f, config)
+        result = await put_new_knowledge_session(f, config)
         
         if result["s_knowledge_id"] != 0:
             print("Success store new document")
@@ -97,7 +97,7 @@ async def streaming(db_pool, chroma, input_data: ChatInput, f: Optional[UploadFi
                 ):
                     if chunk["type"] == "custom":
                         data = json.dumps({"type": "token", "content": chunk["data"]["token"]})
-                            yield f"data: {data}\n\n"
+                        yield f"data: {data}\n\n"
                             
             
             yield f"data: {json.dumps({'type': 'done'})}\n\n"
@@ -107,7 +107,7 @@ async def streaming(db_pool, chroma, input_data: ChatInput, f: Optional[UploadFi
         print(e)
         yield {"status": "error", "content": str(e)}
 
-async def chat_workflow(db_pool, chroma, input_data: ChatInput, f: Optional[UploadFile] = None):
+async def chat_workflow(db_pool, input_data: ChatInput, f: Optional[UploadFile] = None):
     global pool
     pool = db_pool
     lang_core.pool = pool
@@ -130,7 +130,7 @@ async def chat_workflow(db_pool, chroma, input_data: ChatInput, f: Optional[Uplo
     
     if f is not None:
         print("Upload file")
-        result = await put_new_knowledge_session(chroma, f, config)
+        result = await put_new_knowledge_session(f, config)
         
         if result["s_knowledge_id"] != 0:
             print("Success store new document")

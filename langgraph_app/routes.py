@@ -73,7 +73,6 @@ async def chat(
     f: Optional[UploadFile] = File(None),
 ):
     pool = request.app.state.pool
-    chroma = request.app.state.chroma
 
     input_data = ChatInput(**json.loads(input_data))
     streaming = input_data.streaming
@@ -82,11 +81,11 @@ async def chat(
         input_data.thread_id = thread_id
     
     if streaming == False:
-        return await chat_workflow(pool, chroma, input_data, f)
+        return await chat_workflow(pool, input_data, f)
     
     else:
         return StreamingResponse(
-            streaming(pool, chroma, input_data, f), 
+            streaming(pool, input_data, f), 
             media_type="text/event_stream",
             headers={
                 "Cache-Control": "no-cache",
@@ -120,7 +119,7 @@ async def add_user(
 async def upload(request: Request, tenant_id: uuid.UUID, f: UploadFile):
     pool = request.app.state.pool
     
-    return await put_new_knowledge(pool, f, tenant_id)
+    return await put_new_knowledge(f, tenant_id)
 
 
 # @router.get("/get_graph") #✅

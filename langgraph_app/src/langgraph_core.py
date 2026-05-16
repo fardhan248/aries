@@ -438,7 +438,7 @@ async def get_datetime_now() -> str:
 tools = [put_new_memory, fetch_new_knowledge, fetch_new_memory, fetch_new_knowledge_session, calculator, web_search, get_datetime_now]
 tools_by_name = {tool.name: tool for tool in tools}
 
-ollama_llm_tools = gemini_instruct.bind_tools(tools)
+ollama_llm_tools = ollama_llm.bind_tools(tools)
 
 tool_node = ToolNode(tools)
 
@@ -545,6 +545,7 @@ async def check_knowledge_exist(state: State):
         return {
             "selected_knowledge": {
                 "remove": item_remove,
+            },
         }
 
     else:
@@ -803,6 +804,7 @@ async def rag(state: State):
         },
         "chunk_knowledge": {
             "append": chunk_append,
+        },
     }
 
 async def judge_rag(state: State):
@@ -869,7 +871,7 @@ async def basic(state: State):
     messages = trim_messages(
         state["messages"],
         strategy="last",
-        token_counter=gemini_instruct,
+        token_counter=ollama_llm,
         max_tokens=8000,
         start_on="human",
         end_on=("human","tool"),
@@ -902,7 +904,7 @@ async def coding_basic(state: State):
     messages = trim_messages(
         state["messages"],
         strategy="last",
-        token_counter=gemini_instruct,
+        token_counter=ollama_llm,
         max_tokens=8000,
         start_on="human",
         end_on=("human","tool"),
@@ -988,7 +990,7 @@ async def coding_end(state: State):
     messages = trim_messages(
         state["messages"],
         strategy="last",
-        token_counter=gemini_instruct,
+        token_counter=ollama_llm,
         max_tokens=8000,
         start_on="human",
         end_on=("human","tool"),
@@ -1073,7 +1075,7 @@ async def thinking_end(state: State):
     messages = trim_messages(
         state["messages"],
         strategy="last",
-        token_counter=gemini_instruct,
+        token_counter=ollama_llm,
         max_tokens=8000,
         start_on="human",
         end_on=("human","tool"),
