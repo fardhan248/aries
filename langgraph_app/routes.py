@@ -1,7 +1,7 @@
 from fastapi import Request, APIRouter, UploadFile, File, Form, Body
 from fastapi.responses import StreamingResponse
 from src.chat_completion import streaming, get_agent_graph, chat_workflow
-from utils.documents_utils import put_new_knowledge
+from utils.documents_utils import put_new_knowledge, delete_knowledge, delete_knowledge_session, delete_memory
 from typing import Optional
 from src.add_member import new_company, new_user, new_chat
 from body_models.router_models import AddUserInput, ChatInput#, NewChat
@@ -13,7 +13,7 @@ router = APIRouter()
 
 @router.get("/") #✅
 async def root():
-    return {"message": "Chatbot Nusantara is running"}
+    return {"message": "Chatbot Aries is running"}
 
 
 @router.get("/hello") #✅
@@ -64,48 +64,11 @@ async def make_new_chat(
             input_data=input_data.model_dump_json(),
             f=f2,
         )
-    
-    # if input_data.streaming == False:
-        # return chat(
-            # request=request,
-            # thread_id=thread_id,
-            # input_data=input_data.model_dump_json(),
-            # f=f2,
-        # )
-    # else:
-        # return stream_chat(
-            # request=request,
-            # thread_id=thread_id,
-            # input_data=input_data.model_dump_json(),
-            # f=f2,
-        # )
-
-# @router.post("/chat/stream_chat/{thread_id}")
-# async def stream_chat(
-    # request: Request, 
-    # thread_id: uuid.UUID, 
-    # input_data: str = Form(...), 
-    # f: Optional[UploadFile] = File(None),
-# ):
-    # pool = request.app.state.pool
-    
-    # input_data = ChatInput(**json.loads(input_data))
-    
-    # if f:
-        # return StreamingResponse(
-            # streaming(pool, input_data, f), 
-            # media_type="text/plain",
-        # )
-    # else:
-        # return StreamingResponse(
-            # streaming(pool, input_data), 
-            # media_type="text/plain",
-        # )
 
 @router.post("/chat/{thread_id}") #✅
 async def chat(
     request: Request, 
-    thread_id: uuid.UUID, 
+    thread_id: str, 
     input_data: str = Form(...), 
     f: Optional[UploadFile] = File(None),
 ):
@@ -118,23 +81,18 @@ async def chat(
         input_data.thread_id = thread_id
     
     if streaming == False:
-        if f:
-            return await chat_workflow(pool, input_data, f)
-        else:
-            return await chat_workflow(pool, input_data)
+        return await chat_workflow(pool, input_data, f)
     
     else:
-        if f:
-            return StreamingResponse(
-                streaming(pool, input_data, f), 
-                media_type="text/plain",
-            )
-        else:
-            return StreamingResponse(
-                streaming(pool, input_data), 
-                media_type="text/plain",
-            )
-  
+        return StreamingResponse(
+            streaming(pool, input_data, f), 
+            media_type="text/event_stream",
+            headers={
+                "Cache-Control": "no-cache",
+                "Connection": "keep-alive",
+            }
+        )
+
     
 @router.post("/add_member/add_company") #✅
 async def add_company(request: Request, tenant: str = Body(...)):
@@ -145,7 +103,7 @@ async def add_company(request: Request, tenant: str = Body(...)):
 @router.post("/add_member/{tenant_id}/add_user") #✅
 async def add_user(
     request: Request, 
-    tenant_id: uuid.UUID, 
+    tenant_id: str, 
     input_data: AddUserInput,
 ):
     pool = request.app.state.pool
@@ -158,16 +116,31 @@ async def add_user(
 
 # Upload document (RAG)
 @router.post("/upload/{tenant_id}") #✅
-async def upload(request: Request, tenant_id: uuid.UUID, f: UploadFile):
+async def upload(request: Request, tenant_id: str, f: UploadFile):
     pool = request.app.state.pool
     
-    return await put_new_knowledge(pool, f, tenant_id)
+    return await put_new_knowledge(f, tenant_id)
+    
+# Delete knowledge
+@router.post("/delete/knowledge/{tenant_id}")
+async def delete_k(tenant_id: str, knowledge_id: str):
+    return await delete_knowledge(tenant_id, knowledge_id)
+    
+# Delete knowledge session
+@router.post("/delete/knowledge_session/{thread_id}")
+async def delete_k_s(thread_id: str, s_knowledge_id: str):
+    return await delete_knowledge_session(thread_id, s_knowledge_id)
+    
+# Delete memory
+@router.post("/delete/memory/{user_id}")
+async def delete_m(user_id: str, memory_id: str):
+    return await delete_memory(user_id, memory_id)
 
 
-@router.get("/get_graph") #✅
-async def get_graph():
-    await get_agent_graph()
-    return {"status": "success"}
+# @router.get("/get_graph") #✅
+# async def get_graph():
+    # await get_agent_graph()
+    # return {"status": "success"}
     
 
 @router.get("/health") #✅

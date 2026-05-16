@@ -2,17 +2,48 @@ import os, fitz, uuid, base64, asyncio
 from cryptography.hazmat.primitives.ciphers.aead import AESCCM
 from dotenv import load_dotenv
 from langchain_text_splitters import RecursiveCharacterTextSplitter
-from models.gemini import gemini_embedding
-from pathlib import Path
-from string_utils.database_queries import DocumentQueries
-import utils.contextmanager_utils as cm
+from models.ollama_qwen import ollama_embedding
+from langchain_chroma import Chroma
+from langchain_core.documents import Document
+from datetime import datetime, timedelta
+from utils.contextmanager_utils import chroma
 
 load_dotenv()
 
 ENC_KEY = base64.b64decode(os.getenv("KEY"))
-queries = DocumentQueries()
-
 aesccm = AESCCM(ENC_KEY)
+
+splitter = RecursiveCharacterTextSplitter(
+    chunk_size=500,
+    chunk_overlap=50,
+)
+
+
+async def get_vector_store_chroma(collection: str):
+    return Chroma(
+        client=chroma,
+        collection_name=collection,
+        embedding_function=ollama_embedding,
+        collection_metadata={"hnsw:space": "cosine"},
+    )
+    
+async def get_vector_store_retriever(chroma_vector_store, search_filter: dict = None):
+    search_kwargs = {"k": 5}
+    
+    if search_filter:
+        search_kwargs["filter"] = search_filter
+    
+    return chroma_vector_store.as_retriever(
+        search_type="similarity",
+        search_kwargs=search_kwargs,
+    )
+     
+async def str_to_datetime(date: str):
+    try:
+        dt = datetime.strptime(date, "%Y-%m-%d %H:%M:%S.%f")
+    except Exception:
+        dt = datetime.strptime(date, "%Y-%m-%d %H:%M:%S")
+
 
 async def encrypt(text: str) -> bytes:
     if not isinstance(text, str):
@@ -30,7 +61,7 @@ async def decrypt(data: bytes) -> str:
     
     return plaintext.decode()
  
-async def chunk_document(content_type, file_bytes):
+async def chunk_document(filename, content_type, file_bytes, configurable):
     if content_type not in ("application/pdf", "application/epub+zip", "text/plain"):
         if file_bytes[:4] == b"%PDF":
             content_type = "application/pdf"
@@ -60,173 +91,175 @@ async def chunk_document(content_type, file_bytes):
             text = file_bytes.decode("utf-8")
         except UnicodeDecodeError:
             text = file_bytes.decode("latin-1")
+            
+    chunks = splitter.split_text(text)
+            
+    tenant_id = configurable["tenant_id"]
+    user_id = configurable.get("user_id", None)
+    thread_id = configurable.get("thread_id", None)
+    knowledge_id = str(uuid.uuid4())
+    
+    metadatas = [
+        {
+            "filename": filename,
+            "content_type": content_type,
+            "len_pages": len_doc,
+            "number_chunks": len(chunks),
+            "len_char": len(chunk),
+            "tenant_id": tenant_id,
+            "user_id": user_id,
+            "thread_id": thread_id,
+            "knowledge_id": knowledge_id,
+            "chunk_id": str(uuid.uuid4()),
+            "created_at": str(datetime.now()),
+        }
+        for chunk in chunks
+    ]
         
-    splitter = RecursiveCharacterTextSplitter(
-        chunk_size=500,
-        chunk_overlap=50,
-    )
-        
-    return splitter.split_text(text), len_doc
+    return chunks, metadatas
  
 ## Upload user_document per chat, add TTL
-async def save_chunks_session_to_db(pool, chunks, pages, filename, content_type, configurable, prompt):
-    def to_uuid(value: str | uuid.UUID) -> uuid.UUID:
-        return value if isinstance(value, uuid.UUID) else uuid.UUID(value)
+async def save_chunks_session_to_db(chunks, metadatas):
+    for i in range(len(metadatas)):
+        created_at = str_to_datetime(metadatas[i]["created_at"])
+        metadatas[i]["expired_at"] = str(created_at + timedelta(days=7))
     
-    user_id = to_uuid(configurable["user_id"])
-    tenant_id = to_uuid(configurable["tenant_id"])
-    thread_id = to_uuid(configurable["thread_id"])
+    thread_id = metadatas[0]["thread_id"]
+    s_knowledge_id = metadatas[0]["knowledge_id"]
     
-    s_knowledge_id = uuid.uuid4()
-    
-    metadata = {
-        "filename": filename,
-        "content-type": content_type,
-        "pages": pages,
-        "len_chunks": len(chunks),
-    }
-    
-    vector = await gemini_embedding.aembed_documents(chunks)
-
-    encrypted_chunks = await asyncio.gather(
-        *(encrypt(chunk) for chunk in chunks)
-    )
-    
-    encrypt_metadata = await encrypt(metadata)
-
-    records = [
-        (uuid.uuid4(), s_knowledge_id, tenant_id, user_id, thread_id, chunk, vec)
-        for chunk, vec in zip(encrypted_chunks, vector)
+    documents = [
+        Document(
+            page_content=chunks[i],
+            metadata=metadatas[i],
+            id=metadatas[i]["chunk_id"],
+        )
+        for i in range(len(chunks))
     ]
     
-    chunk_ids = [str(r[0]) for r in records]
+    uuids = [x["chunk_id"] for x in metadatas]
     
     try:
-        async with pool.acquire() as conn:
-            await conn.execute(
-                queries.INPUT_SESSION_KNOWLEDGES,
-                s_knowledge_id, tenant_id, user_id, thread_id, encrypt_metadata
-            )
-            
-            await conn.executemany(
-                queries.INPUT_SESSION_KNOWLEDGE_CHUNKS,
-                records
-            )
+        vector_store = await get_vector_store_chroma(f"thread_{thread_id.replace('-', '_')}")
+        
+        await vector_store.aadd_documents(documents=documents, ids=uuids)
 
     except Exception as e:
         print(e)
-        return {"status": "error", "s_knowledge_id": 0, "user_id": 0, "content": str(e)}
+        return {"status": "error", "s_knowledge_id": 0, "thread_id": thread_id, "content": str(e)}
         
-    return {"status": "success", "s_knowledge_id": str(s_knowledge_id), "user_id": user_id, "metadata": metadata, "chunk_ids": chunk_ids}
+    return {"status": "success", "s_knowledge_id": s_knowledge_id, "thread_id": thread_id, "chunk_ids": uuids, "metadata": metadatas}
 
-async def put_new_knowledge_session(pool, f, config, prompt):
+async def put_new_knowledge_session(f, config):    
     filename = f.filename
     content_type = f.content_type
     file_bytes = await f.read()
-    print("content_type", content_type, filename)
+    
     configurable = config["configurable"]
-    user_id = configurable["user_id"]
-    thread_id = configurable["thread_id"]
     
     # Upload file to storage
-    try:
-        response = await (
-            cm.supabase_client.storage.from_("knowledge_session").upload(
-                file=file_bytes,
-                path=f"{str(thread_id)}/{filename}",
-                file_options={
-                    "content-type": content_type,
-                    "upsert": "false"
-                }
-            )
-        )
-        
+    try:        
         # Chunking document
-        chunks, pages = await chunk_document(content_type, file_bytes)
+        chunks, metadatas = await chunk_document(filename, content_type, file_bytes, configurable)
         
-        result = await save_chunks_session_to_db(pool, chunks, pages, filename, content_type, configurable, prompt)
+        result = await save_chunks_session_to_db(chunks, metadatas)
         
         return result
 
     except Exception as e:
         print(e)
-        return {"status": "double", "s_knowledge_id": 0, "user_id": 0, "content": str(e)}
+        return {"status": "error", "s_knowledge_id": 0, "user_id": 0, "content": str(e)}
 
 ## Tool: Put new knowledge (by tenant admin)
-async def save_chunks_to_db(pool, chunks, pages, filename, content_type, tenant_id):
-    if not isinstance(tenant_id, uuid.UUID):
-        tenant_id = uuid.UUID(tenant_id)
+async def save_chunks_to_db(chunks, metadatas):
+    tenant_id = metadatas[0]["tenant_id"]
+    knowledge_id = metadatas[0]["knowledge_id"]
     
-    knowledge_id = uuid.uuid4()
+    documents = [
+        Document(
+            page_content=chunks[i],
+            metadata=metadatas[i],
+            id=metadatas[i]["chunk_id"],
+        )
+        for i in range(len(chunks))
+    ]
     
-    metadata = {
-        "filename": filename,
-        "content-type": content_type,
-        "pages": pages,
-        "len_chunks": len(chunks),
-    }
-
-    vector = await gemini_embedding.aembed_documents(chunks)
-    
-    encrypted_chunks = await asyncio.gather(
-        *(encrypt(chunk) for chunk in chunks)
-    )
-    
-    encrypted_metadata = await encrypt(metadata)
-
-    records = [
-        (uuid.uuid4(), knowledge_id, tenant_id, chunk, vec)
-        for chunk, vec in zip(encrypted_chunks, vector)
-    ] 
-    
-    chunk_ids = [str(r[0]) for r in records]
+    uuids = [x["chunk_id"] for x in metadatas]
     
     try:
-        async with pool.acquire() as conn:
-            await conn.execute(
-                queries.INPUT_KNOWLEDGES,
-                knowledge_id, tenant_id, encrypted_metadata
-            )
-            
-            await conn.executemany(
-                queries.INPUT_KNOWLEDGE_CHUNKS,
-                records
-            )
+        vector_store = await get_vector_store_chroma(f"tenant_{tenant_id.replace('-', '_')}")
+        
+        await vector_store.aadd_documents(documents=documents, ids=uuids)
 
     except Exception as e:
         print(e)
-        return {"status": "error", "knowledge_id": 0, "tenant_id": 0, "content": str(e)}
+        return {"status": "error", "knowledge_id": 0, "tenant_id": tenant_id, "content": str(e)}
         
-    return {"status": "success", "knowledge_id": str(knowledge_id), "tenant_id": tenant_id, "metadata": metadata, "chunk_ids": chunk_ids}
-
-async def put_new_knowledge(db_pool, f, tenant_id):
-    global pool
-    pool = db_pool
+    return {"status": "success", "knowledge_id": knowledge_id, "tenant_id": tenant_id, "chunk_ids": uuids, "metadata": metadatas}
     
+async def put_new_knowledge(f, tenant_id):    
     filename = f.filename
     content_type = f.content_type
     file_bytes = await f.read()
-    print("content_type", content_type, filename)
-    # Upload file to storage
+    
     try:
-        response = await (
-            cm.supabase_client.storage.from_("knowledges").upload(
-                file=file_bytes,
-                path=f"{str(tenant_id)}/{filename}",
-                file_options={
-                    "content-type": content_type,
-                    "upsert": "false"
-                }
-            )
-        )
-        
         # Chunking document
-        chunks, pages = await chunk_document(content_type, file_bytes)
+        chunks, metadatas = await chunk_document(filename, content_type, file_bytes, {"tenant_id": tenant_id})
         
-        result = await save_chunks_to_db(pool, chunks, pages, filename, content_type, tenant_id)
+        result = await save_chunks_to_db(chunks, metadatas)
       
         return result
     
     except Exception as e:
         print(e)
-        return {"status": "double", "s_knowledge_id": 0, "user_id": 0, "content": str(e)}
+        return {"status": "error", "knowledge_id": 0, "tenant_id": 0, "content": str(e)}
+        
+async def delete_knowledge(tenant_id: str, knowledge_id: str):
+    try:
+        vector_store = await get_vector_store_chroma(f"tenant_{tenant_id.replace('-', '_')}")
+        
+        collection = vector_store._collection
+        
+        await asyncio.get_event_loop().run_in_executor(
+            None,
+            lambda: collection.delete(where={"knowledge_id": knowledge_id})
+        )
+        
+        return {"status": "success", "content": f"Delete knowledge_id {knowledge_id} success."}
+    
+    except Exception as e:
+        print(e)
+        return {"status": "error", "content": str(e)}
+    
+async def delete_knowledge_session(thread_id: str, s_knowledge_id: str):   
+    try:
+        vector_store = await get_vector_store_chroma(f"thread_{thread_id.replace('-', '_')}")
+        
+        collection = vector_store._collection
+        
+        await asyncio.get_event_loop().run_in_executor(
+            None,
+            lambda: collection.delete(where={"knowledge_id": s_knowledge_id})
+        )
+        
+        return {"status": "success", "content": f"Delete s_knowledge_id {s_knowledge_id} success."}
+    
+    except Exception as e:
+        print(e)
+        return {"status": "error", "content": str(e)}
+   
+async def delete_memory(user_id: str, memory_id: str):
+    try:
+        vector_store = await get_vector_store_chroma(f"user_{user_id.replace('-', '_')}")
+        
+        collection = vector_store._collection
+        
+        await asyncio.get_event_loop().run_in_executor(
+            None,
+            lambda: collection.delete(where={"memory_id": memory_id})
+        )
+        
+        return {"status": "success", "content": f"Delete memory_id {memory_id} success."}
+    
+    except Exception as e:
+        print(e)
+        return {"status": "error", "content": str(e)}

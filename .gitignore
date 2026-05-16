@@ -1,6 +1,7 @@
 .env
 key.txt
 .git
+*.gguf
 
 __pycache__/
 *.pyc
