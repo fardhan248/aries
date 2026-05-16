@@ -1,4 +1,4 @@
-import os, fitz, uuid, base64
+import os, fitz, uuid, base64, asyncio
 from cryptography.hazmat.primitives.ciphers.aead import AESCCM
 from dotenv import load_dotenv
 from langchain_text_splitters import RecursiveCharacterTextSplitter
@@ -212,3 +212,54 @@ async def put_new_knowledge(f, tenant_id):
     except Exception as e:
         print(e)
         return {"status": "error", "knowledge_id": 0, "tenant_id": 0, "content": str(e)}
+        
+async def delete_knowledge(tenant_id: str, knowledge_id: str):
+    try:
+        vector_store = await get_vector_store_chroma(f"tenant_{tenant_id.replace('-', '_')}")
+        
+        collection = vector_store._collection
+        
+        await asyncio.get_event_loop().run_in_executor(
+            None,
+            lambda: collection.delete(where={"knowledge_id": knowledge_id})
+        )
+        
+        return {"status": "success", "content": f"Delete knowledge_id {knowledge_id} success."}
+    
+    except Exception as e:
+        print(e)
+        return {"status": "error", "content": str(e)}
+    
+async def delete_knowledge_session(thread_id: str, s_knowledge_id: str):   
+    try:
+        vector_store = await get_vector_store_chroma(f"thread_{thread_id.replace('-', '_')}")
+        
+        collection = vector_store._collection
+        
+        await asyncio.get_event_loop().run_in_executor(
+            None,
+            lambda: collection.delete(where={"knowledge_id": s_knowledge_id})
+        )
+        
+        return {"status": "success", "content": f"Delete s_knowledge_id {s_knowledge_id} success."}
+    
+    except Exception as e:
+        print(e)
+        return {"status": "error", "content": str(e)}
+   
+async def delete_memory(user_id: str, memory_id: str):
+    try:
+        vector_store = await get_vector_store_chroma(f"user_{user_id.replace('-', '_')}")
+        
+        collection = vector_store._collection
+        
+        await asyncio.get_event_loop().run_in_executor(
+            None,
+            lambda: collection.delete(where={"memory_id": memory_id})
+        )
+        
+        return {"status": "success", "content": f"Delete memory_id {memory_id} success."}
+    
+    except Exception as e:
+        print(e)
+        return {"status": "error", "content": str(e)}

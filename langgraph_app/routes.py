@@ -1,7 +1,7 @@
 from fastapi import Request, APIRouter, UploadFile, File, Form, Body
 from fastapi.responses import StreamingResponse
 from src.chat_completion import streaming, get_agent_graph, chat_workflow
-from utils.documents_utils import put_new_knowledge
+from utils.documents_utils import put_new_knowledge, delete_knowledge, delete_knowledge_session, delete_memory
 from typing import Optional
 from src.add_member import new_company, new_user, new_chat
 from body_models.router_models import AddUserInput, ChatInput#, NewChat
@@ -68,7 +68,7 @@ async def make_new_chat(
 @router.post("/chat/{thread_id}") #✅
 async def chat(
     request: Request, 
-    thread_id: uuid.UUID, 
+    thread_id: str, 
     input_data: str = Form(...), 
     f: Optional[UploadFile] = File(None),
 ):
@@ -103,7 +103,7 @@ async def add_company(request: Request, tenant: str = Body(...)):
 @router.post("/add_member/{tenant_id}/add_user") #✅
 async def add_user(
     request: Request, 
-    tenant_id: uuid.UUID, 
+    tenant_id: str, 
     input_data: AddUserInput,
 ):
     pool = request.app.state.pool
@@ -116,10 +116,25 @@ async def add_user(
 
 # Upload document (RAG)
 @router.post("/upload/{tenant_id}") #✅
-async def upload(request: Request, tenant_id: uuid.UUID, f: UploadFile):
+async def upload(request: Request, tenant_id: str, f: UploadFile):
     pool = request.app.state.pool
     
     return await put_new_knowledge(f, tenant_id)
+    
+# Delete knowledge
+@router.post("/delete/knowledge/{tenant_id}")
+async def delete_k(tenant_id: str, knowledge_id: str):
+    return await delete_knowledge(tenant_id, knowledge_id)
+    
+# Delete knowledge session
+@router.post("/delete/knowledge_session/{thread_id}")
+async def delete_k_s(thread_id: str, s_knowledge_id: str):
+    return await delete_knowledge_session(thread_id, s_knowledge_id)
+    
+# Delete memory
+@router.post("/delete/memory/{user_id}")
+async def delete_m(user_id: str, memory_id: str):
+    return await delete_memory(user_id, memory_id)
 
 
 # @router.get("/get_graph") #✅
