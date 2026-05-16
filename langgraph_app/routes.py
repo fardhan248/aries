@@ -33,6 +33,7 @@ async def make_new_chat(
     input_data = ChatInput(**json.loads(input_data))
     
     if f is not None:
+        print("Uploaded file")
         file_content = await f.read()
         f2 = UploadFile(
             filename=f.filename,
@@ -81,7 +82,7 @@ async def chat(
         input_data.thread_id = thread_id
     
     if streaming == False:
-        return await chat_workflow(pool, input_data, f)
+        return await chat_workflow(pool, input_data, f) #✅
     
     else:
         return StreamingResponse(
@@ -115,19 +116,19 @@ async def add_user(
 
 
 # Upload document (RAG)
-@router.post("/upload/{tenant_id}") #✅
+@router.post("/ingest/{tenant_id}") #✅
 async def upload(request: Request, tenant_id: str, f: UploadFile):
     pool = request.app.state.pool
     
     return await put_new_knowledge(f, tenant_id)
     
 # Delete knowledge
-@router.post("/delete/knowledge/{tenant_id}")
+@router.post("/delete/knowledge/{tenant_id}") #✅
 async def delete_k(tenant_id: str, knowledge_id: str):
     return await delete_knowledge(tenant_id, knowledge_id)
     
 # Delete knowledge session
-@router.post("/delete/knowledge_session/{thread_id}")
+@router.post("/delete/knowledge_session/{thread_id}") #✅
 async def delete_k_s(thread_id: str, s_knowledge_id: str):
     return await delete_knowledge_session(thread_id, s_knowledge_id)
     
@@ -135,7 +136,6 @@ async def delete_k_s(thread_id: str, s_knowledge_id: str):
 @router.post("/delete/memory/{user_id}")
 async def delete_m(user_id: str, memory_id: str):
     return await delete_memory(user_id, memory_id)
-
 
 # @router.get("/get_graph") #✅
 # async def get_graph():

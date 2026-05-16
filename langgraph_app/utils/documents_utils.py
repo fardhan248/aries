@@ -2,11 +2,14 @@ import os, fitz, uuid, base64, asyncio
 from cryptography.hazmat.primitives.ciphers.aead import AESCCM
 from dotenv import load_dotenv
 from langchain_text_splitters import RecursiveCharacterTextSplitter
-from models.ollama_qwen import ollama_embedding
+# from models.ollama_qwen import ollama_embedding
+from models.gemini import gemini_embedding
 from langchain_chroma import Chroma
 from langchain_core.documents import Document
 from datetime import datetime, timedelta
-from utils.contextmanager_utils import chroma
+import utils.contextmanager_utils as cm
+
+ollama_embedding = gemini_embedding
 
 load_dotenv()
 
@@ -21,7 +24,7 @@ splitter = RecursiveCharacterTextSplitter(
 
 async def get_vector_store_chroma(collection: str):
     return Chroma(
-        client=chroma,
+        client=cm.chroma,
         collection_name=collection,
         embedding_function=ollama_embedding,
         collection_metadata={"hnsw:space": "cosine"},
@@ -44,6 +47,7 @@ async def str_to_datetime(date: str):
     except Exception:
         dt = datetime.strptime(date, "%Y-%m-%d %H:%M:%S")
 
+    return dt
 
 async def encrypt(text: str) -> bytes:
     if not isinstance(text, str):
@@ -121,7 +125,7 @@ async def chunk_document(filename, content_type, file_bytes, configurable):
 ## Upload user_document per chat, add TTL
 async def save_chunks_session_to_db(chunks, metadatas):
     for i in range(len(metadatas)):
-        created_at = str_to_datetime(metadatas[i]["created_at"])
+        created_at = await str_to_datetime(metadatas[i]["created_at"])
         metadatas[i]["expired_at"] = str(created_at + timedelta(days=7))
     
     thread_id = metadatas[0]["thread_id"]

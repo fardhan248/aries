@@ -67,7 +67,7 @@ async def streaming(db_pool, input_data: ChatInput, f: Optional[UploadFile] = No
                             "mode": mode, 
                             "streaming_mode": True,
                             "retrieved_session_knowledge": {
-                                "append": [{result["s_knowledge_id"]: {"metadata": result["metadata"], "chunk_ids": result["chunk_ids"]}}],
+                                "append": [{"s_knowledge_id": result["s_knowledge_id"], "chunk_ids": result["chunk_ids"]}],
                             },
                         },
                         config,
@@ -155,7 +155,7 @@ async def chat_workflow(db_pool, input_data: ChatInput, f: Optional[UploadFile] 
                             "mode": mode, 
                             "streaming_mode": False,
                             "retrieved_session_knowledge": {
-                                "append": [{result["s_knowledge_id"]: {"metadata": result["metadata"], "chunk_ids": result["chunk_ids"]}}],
+                                "append": [{"s_knowledge_id": result["s_knowledge_id"], "chunk_ids": result["chunk_ids"]}],
                             },
                         },
                         config,

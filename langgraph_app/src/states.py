@@ -13,11 +13,13 @@ def items_reducer(current: list, new: dict | list):
     result = copy.deepcopy(current)
     
     # Fan-in 
-    if isinstance(new, list) and any(isinstance(i, dict) and
-        any(k in i for k in ("append", "replace", "remove")) for i in new):
-        for update in new:
-            result = items_reducer(result, update)
-        return result
+    if isinstance(new, list):
+        if any(isinstance(i, dict) and any(k in i for k in ("append", "replace", "remove")) for i in new):
+            for update in new:
+                result = items_reducer(result, update)
+            return result
+        else:
+            new = [{"append": new}]
     
     # Remove element
     for item in new.get("remove", []):

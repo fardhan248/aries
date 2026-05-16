@@ -40,6 +40,8 @@ def convert_uuids(obj):
         }
     elif isinstance(obj, list):
         return [convert_uuids(i) for i in obj]
+    elif isinstance(obj, set):
+        return list(obj)
     elif isinstance(obj, uuid.UUID):
         return str(obj)
     return obj
@@ -290,11 +292,15 @@ class AsyncPostgresSaver(BasePostgresSaver):
                 pass
             elif isinstance(v, (str, int, float, bool)):
                 pass
+            elif isinstance(v, set):
+                copy["channel_values"][k] = list(v)
             elif k in ["chunk_knowledge", "chunk_retrieved_session_knowledge", "memory", "reasoning_questions_observation", "mode", "last_query", "iteration", "route"]:
                 del copy["channel_values"][k]
             else:
                 if k in ["selected_knowledge", "retrieved_session_knowledge", "memory_ids", "messages"]:
                     blob_values[k] = copy["channel_values"].pop(k)
+                else:
+                    del copy["channel_values"][k]
 
         async with self._cursor(pipeline=True) as cur:
             if blob_versions := {
@@ -312,6 +318,7 @@ class AsyncPostgresSaver(BasePostgresSaver):
                         blob_versions,
                     ),
                 )
+
 
             copy_json = convert_uuids(copy)
 
@@ -451,6 +458,15 @@ class AsyncPostgresSaver(BasePostgresSaver):
             including its configuration, metadata, parent checkpoint (if any),
             and pending writes.
         """
+        loaded_channel_values = {
+            **(value["checkpoint"].get("channel_values") or {}),
+            **self._load_blobs(value["channel_values"]),
+        }
+        
+        for k, v in loaded_channel_values.items():
+            if isinstance(v, list) and "+" in k and k.count(":") >= 2:
+                loaded_channel_values[k] = set(v)
+        
         return CheckpointTuple(
             {
                 "configurable": {
@@ -463,10 +479,7 @@ class AsyncPostgresSaver(BasePostgresSaver):
             },
             {
                 **value["checkpoint"],
-                "channel_values": {
-                    **(value["checkpoint"].get("channel_values") or {}),
-                    **self._load_blobs(value["channel_values"]),
-                },
+                "channel_values": loaded_channel_values,
             },
             value["metadata"],
             (

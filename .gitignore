@@ -3,5 +3,7 @@ key.txt
 .git
 *.gguf
 
+chroma_data/
+
 __pycache__/
 *.pyc
