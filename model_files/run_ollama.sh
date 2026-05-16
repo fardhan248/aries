@@ -2,9 +2,13 @@
 
 echo "Starting Ollama LLM server..."
 ollama serve &
-sleep 5
-echo "Ollama is ready, creating the LLM model..."
 
+echo "Waiting for Ollama..."
+until ollama list >/dev/null 2>&1; do
+  sleep 1
+done
+
+echo "Ollama is ready, creating the LLM model..."
 ollama create qwen_llm -f model_files/Modelfile
 tail -f /dev/null
 #ollama run qwen_llm
