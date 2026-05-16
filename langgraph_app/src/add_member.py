@@ -4,7 +4,7 @@ from utils.documents_utils import encrypt, decrypt
 from string_utils.prompts import PromptTitle
 from utils.documents_utils import encrypt, decrypt
 from src.chat_completion import streaming, chat_workflow
-from models.gemini import gemini
+from models.ollama_qwen import ollama_llm
 import os, uuid
 
 pool = None
@@ -66,7 +66,7 @@ async def new_chat(db_pool, input_data: dict):
                 "input_prompt": input_prompt,
             })
             
-            title = await gemini.ainvoke(SESSION_TITLE_SYSTEM_QUERY)
+            title = await ollama_llm.ainvoke(SESSION_TITLE_SYSTEM_QUERY)
             encrypted_title = await encrypt(title)
             
             await conn.execute(
