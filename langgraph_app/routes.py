@@ -13,7 +13,7 @@ router = APIRouter()
 
 @router.get("/") #✅
 async def root():
-    return {"message": "Chatbot Nusantara is running"}
+    return {"message": "Chatbot Aries is running"}
 
 
 @router.get("/hello") #✅
