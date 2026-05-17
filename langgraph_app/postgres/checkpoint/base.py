@@ -111,13 +111,6 @@ def convert_message_to_dict(obj):
     
     return obj
 
-def convert_uuid_keys(obj):
-    if isinstance(obj, dict):
-        return {str(k) if isinstance(k, uuid.UUID) else k: convert_uuid_keys(v) for k, v in obj.items()}
-    elif isinstance(obj, list):
-        return [convert_uuid_keys(i) for i in obj]
-    return obj
-
 def restore_uuid_keys(obj):
     if isinstance(obj, dict):
         restored = {}

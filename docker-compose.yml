@@ -68,11 +68,7 @@ services:
         environment:
             ANONYMIZED_TELEMETRY: "FALSE"
             IS_PERSISTENT: "TRUE"
-            PERSIST_DIRECTORY: "/chroma/chroma"
             CHROMA_SERVER_HTTP_PORT: "8000"
         volumes:
-            - chroma_data:/chroma/chroma
+            - ./chroma_data:/data
         restart: no
-        
-volumes: 
-    chroma_data:
