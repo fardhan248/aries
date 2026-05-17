@@ -537,7 +537,7 @@ async def check_knowledge_exist(state: State):
             item_remove.append(selected_knowledge[i])
     
     selected_knowledge = [x for i, x in enumerate(selected_knowledge) if i not in idx_remove]
-    chunk_ids = [c_id for x in retrieved_session_knowledge for c_id in x["chunk_ids"]]
+    chunk_ids = [c_id for x in selected_knowledge for c_id in x["chunk_ids"]]
     
     if len(selected_knowledge) == 0 and len(item_remove) > 0:
         # Retrieved in state but deleted in the database

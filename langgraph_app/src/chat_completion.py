@@ -100,7 +100,7 @@ async def streaming(db_pool, input_data: ChatInput, f: Optional[UploadFile] = No
                         yield json.dumps({"type": "token", "content": chunk["data"]["token"]})
                             
             
-            yield f"data: {json.dumps({'type': 'done'})}"
+            yield f"data: {json.dumps({'type': 'done', "thread_id": thread_id})}"
             
     except Exception as e:
         # logger.error(traceback.format_exc())
@@ -108,7 +108,7 @@ async def streaming(db_pool, input_data: ChatInput, f: Optional[UploadFile] = No
         yield {"status": "error", "content": ""}
         
     finally:
-        yield json.dumps({'type': 'done'})
+        yield json.dumps({'type': 'done', "thread_id": thread_id})
 
 async def chat_workflow(db_pool, input_data: ChatInput, f: Optional[UploadFile] = None):
     global pool

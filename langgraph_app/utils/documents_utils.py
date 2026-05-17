@@ -6,6 +6,7 @@ from models.ollama_qwen import ollama_embedding
 from langchain_chroma import Chroma
 from langchain_core.documents import Document
 from datetime import datetime, timedelta
+from zoneinfo import ZoneInfo
 import utils.contextmanager_utils as cm
 
 load_dotenv()
@@ -112,7 +113,7 @@ async def chunk_document(filename, content_type, file_bytes, configurable):
             "thread_id": thread_id,
             "knowledge_id": knowledge_id,
             "chunk_id": str(uuid.uuid4()),
-            "created_at": str(datetime.now()),
+            "created_at": str(datetime.now(ZoneInfo("Asia/Jakarta"))),
         }
         for chunk in chunks
     ]
