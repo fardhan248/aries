@@ -76,12 +76,12 @@ async def chat(
     pool = request.app.state.pool
 
     input_data = ChatInput(**json.loads(input_data))
-    streaming = input_data.streaming
+    stream = input_data.streaming
     
     if input_data.thread_id is None and thread_id is not None:
         input_data.thread_id = thread_id
     
-    if streaming == False:
+    if stream == False:
         return await chat_workflow(pool, input_data, f) #✅
     
     else:

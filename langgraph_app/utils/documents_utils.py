@@ -222,11 +222,24 @@ async def delete_knowledge(tenant_id: str, knowledge_id: str):
         vector_store = await get_vector_store_chroma(f"tenant_{tenant_id.replace('-', '_')}")
         
         collection = vector_store._collection
+        collection_name = collection.name
         
         await asyncio.get_event_loop().run_in_executor(
             None,
             lambda: collection.delete(where={"knowledge_id": knowledge_id})
         )
+        
+        knowledge_ids = await asyncio.get_event_loop().run_in_executor(
+            None,
+            lambda: collection.get(where={"tenant_id": tenant_id}, include=[])
+        )
+
+        if len(knowledge_ids["ids"]) == 0:
+            client = vector_store._client
+            await asyncio.get_event_loop().run_in_executor(
+                None,
+                lambda: client.delete_collection(collection_name)
+            )
         
         return {"status": "success", "content": f"Delete knowledge_id {knowledge_id} success."}
     
@@ -239,11 +252,24 @@ async def delete_knowledge_session(thread_id: str, s_knowledge_id: str):
         vector_store = await get_vector_store_chroma(f"thread_{thread_id.replace('-', '_')}")
         
         collection = vector_store._collection
+        collection_name = collection.name
         
         await asyncio.get_event_loop().run_in_executor(
             None,
             lambda: collection.delete(where={"knowledge_id": s_knowledge_id})
         )
+        
+        knowledge_ids = await asyncio.get_event_loop().run_in_executor(
+            None,
+            lambda: collection.get(where={"thread_id": thread_id}, include=[])
+        )
+        
+        if len(knowledge_ids["ids"]) == 0:
+            client = vector_store._client
+            await asyncio.get_event_loop().run_in_executor(
+                None,
+                lambda: client.delete_collection(collection_name)
+            )
         
         return {"status": "success", "content": f"Delete s_knowledge_id {s_knowledge_id} success."}
     
@@ -256,11 +282,24 @@ async def delete_memory(user_id: str, memory_id: str):
         vector_store = await get_vector_store_chroma(f"user_{user_id.replace('-', '_')}")
         
         collection = vector_store._collection
+        collection_name = collection.name
         
         await asyncio.get_event_loop().run_in_executor(
             None,
             lambda: collection.delete(where={"memory_id": memory_id})
         )
+        
+        knowledge_ids = await asyncio.get_event_loop().run_in_executor(
+            None,
+            lambda: collection.get(where={"user_id": user_id}, include=[])
+        )
+        
+        if len(knowledge_ids["ids"]) == 0:
+            client = vector_store._client
+            await asyncio.get_event_loop().run_in_executor(
+                None,
+                lambda: client.delete_collection(collection_name)
+            )
         
         return {"status": "success", "content": f"Delete memory_id {memory_id} success."}
     

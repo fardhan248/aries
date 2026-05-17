@@ -75,11 +75,11 @@ async def streaming(db_pool, input_data: ChatInput, f: Optional[UploadFile] = No
                         version="v2",
                     ):
                         if chunk["type"] == "custom":
-                            data = json.dumps({"type": "token", "content": chunk["data"]["token"]})
-                            yield f"data: {data}\n\n"
+                            # data = json.dumps({"type": "token", "content": chunk["data"]["token"]})
+                            yield json.dumps({"type": "token", "content": chunk["data"]["token"]}) # f"data: {data}\n\n"
                                     
                 else:
-                    yield result
+                    yield json.dumps(result)
             
             else:
                 async for chunk in agent.astream(
@@ -96,16 +96,19 @@ async def streaming(db_pool, input_data: ChatInput, f: Optional[UploadFile] = No
                     version="v2",
                 ):
                     if chunk["type"] == "custom":
-                        data = json.dumps({"type": "token", "content": chunk["data"]["token"]})
-                        yield f"data: {data}\n\n"
+                        # data = json.dumps({"type": "token", "content": chunk["data"]["token"]})
+                        yield json.dumps({"type": "token", "content": chunk["data"]["token"]})
                             
             
-            yield f"data: {json.dumps({'type': 'done'})}\n\n"
+            yield json.dumps({'type': 'done'})
             
     except Exception as e:
-        logger.error(traceback.format_exc())
-        print(e)
-        yield {"status": "error", "content": str(e)}
+        # logger.error(traceback.format_exc())
+        traceback.print_exc()
+        yield {"status": "error", "content": ""}
+        
+    finally:
+        yield json.dumps({'type': 'done'})
 
 async def chat_workflow(db_pool, input_data: ChatInput, f: Optional[UploadFile] = None):
     global pool
@@ -193,9 +196,9 @@ async def chat_workflow(db_pool, input_data: ChatInput, f: Optional[UploadFile] 
 
                 return {"thread_id": str(thread_id), "content": text}
     except Exception as e:
-        logger.error(traceback.format_exc())
-        print(e)
-        return {"status": "error", "content": str(e)}
+        # logger.error(traceback.format_exc())
+        traceback.print_exc()
+        return {"status": "error", "content": ""}
                 
 async def get_agent_graph():
     builder = await get_agent()

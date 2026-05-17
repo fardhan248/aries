@@ -10,9 +10,10 @@ from langgraph.prebuilt import InjectedState, ToolNode
 from langchain_core.tools import InjectedToolCallId, tool
 from langchain_community.tools import DuckDuckGoSearchResults
 from langchain_core.documents import Document
+from langgraph.config import get_stream_writer
 
 from typing_extensions import Annotated, Any
-import uuid, copy, numexpr, json
+import uuid, copy, numexpr, json, traceback
 import numpy as np
 from datetime import datetime
 from zoneinfo import ZoneInfo
@@ -72,6 +73,7 @@ async def put_new_memory(
         vector_store = await get_vector_store_chroma(f"user_{user_id.replace('-', '_')}")
         await vector_store.aadd_documents(documents=[document], ids=[memory_id])
         
+        print("Tool: put_new_memory end")
         return Command(
             update={
                 "messages": [
@@ -91,7 +93,7 @@ async def put_new_memory(
         )
     
     except Exception as e:
-        print(e)
+        traceback.print_exc()
         return "Failed put new memory to the database." 
 
 ## Tool: Fetch new knowledge (yang gak ada di state["selected_knowledge"]) 
@@ -131,6 +133,7 @@ async def fetch_new_knowledge(
         results = await retriever.ainvoke(query)
         
         if len(results) == 0:
+            print("Tool: fetch_new_knowledge end")
             return "Success. Based on the query, the knowledge is not exist in the database."
             
         selected_knowledge_dict = {x["knowledge_id"]: {"chunk_ids": x["chunk_ids"]} for x in selected_knowledge}
@@ -155,6 +158,7 @@ async def fetch_new_knowledge(
             selected_knowledge_dict[knowledge_id]["chunk_ids"].append(chunk_id)
             chunk_append.append({"chunk_id": chunk_id, "content": content, "metadata": metadata})
             
+        print("Tool: fetch_new_knowledge end")
         return Command(
             update={
                 "messages": [
@@ -173,9 +177,9 @@ async def fetch_new_knowledge(
                 },
             }
         )
-
+        
     except Exception as e:
-        print(e)
+        traceback.print_exc()
         return "Failed fetch new knowledge from database."
     
 ## Tool: Fetch new knowledge_session (yang gak ada di state["retrieved_session_knowledge"])
@@ -216,6 +220,7 @@ async def fetch_new_knowledge_session(
         results = await retriever.ainvoke(query)
         
         if len(results) == 0:
+            print("Tool: fetch_knowledge_session end")
             return "Success. Based on the query, the session knowledge is not exist in the database."
             
         retrieved_session_knowledge_dict = {x["s_knowledge_id"]: {"chunk_ids": x["chunk_ids"]} for x in retrieved_session_knowledge}
@@ -240,6 +245,7 @@ async def fetch_new_knowledge_session(
             retrieved_session_knowledge_dict[s_knowledge_id]["chunk_ids"].append(chunk_id)
             chunk_append.append({"chunk_id": chunk_id, "content": content, "metadata": metadata})
             
+        print("Tool: fetch_knowledge_session end")
         return Command(
             update={
                 "messages": [
@@ -260,7 +266,7 @@ async def fetch_new_knowledge_session(
         )
 
     except Exception as e:
-        print(e)
+        traceback.print_exc()
         return "Failed fetch new knowledge from database."
     
 ## Tool: Fetch new memory (yang gak ada di state["memory_ids"])
@@ -299,6 +305,7 @@ async def fetch_new_memory(
         results = await retriever.ainvoke(query)
         
         if len(results) == 0:
+            print("Tool: fetch_new_memory end")
             return "Success. Based on the query, the memory is not exist in the database."
     
         memory_append = []
@@ -309,9 +316,11 @@ async def fetch_new_memory(
             memory_id = metadata["memory_id"]
             if memory_id not in memory_ids_list:
                 content = result.page_content
-                memory_append.append({"memory_id": memory_id, "content": content})
+                memory_append.append({"memory_id": memory_id, "content": content, "metadata": metadata})
                 memory_ids_append.append({"memory_id": memory_id})
                 
+                
+        print("Tool: fetch_new_memory end")
         return Command(
             update={
                 "messages": [
@@ -331,7 +340,7 @@ async def fetch_new_memory(
         )
         
     except Exception as e:
-        print(e)
+        traceback.print_exc()
         return "Failed fetch new memory from the database."
     
 ## Tool: calculator, etc
@@ -385,9 +394,11 @@ async def calculator(expression: CalculatorExpression) -> str:
     try:
         expr = expression.expr.format_map(expression.variables)
         result = numexpr.evaluate(expr)
+        
+        print("Tool: calculator end")
         return str(result.item() if hasattr(result, "item") else result)
     except Exception as e:
-        print(e)
+        traceback.print_exc()
         return f"Failed to evaluate expression: {expression}."
 
 ## Tool: web search
@@ -413,9 +424,10 @@ async def web_search(query: str) -> list[dict[str, str]]:
     """
     print("Tool: web_search")
     try:
+        print("Tool: web_search end")
         return await search.ainvoke(query)
     except Exception as e:
-        print(e)
+        traceback.print_exc()
         return f"Failed to seacrh {query} in the web."
 
 ## Tool: get datetime now
@@ -433,14 +445,15 @@ async def get_datetime_now() -> str:
     """
     print("Tool: get_datetime_now")
     try:
-        return "Year-Month-Date Hour:Minute:Second: " + str(datetime.now(ZoneInfo("Asia/Jakarta")))
+        now = datetime.now(ZoneInfo("Asia/Jakarta"))
+        print("Tool: get_datetime_now end")
+        return f"DayName Year-Month-Date Hour:Minute:Second: {now.strftime('%A')} {str(now)}"
     except Exception as e:
-        print(e)
+        traceback.print_exc()
         return f"Failed to get current datetime."
 
 ## Define Tools node
 tools = [put_new_memory, fetch_new_knowledge, fetch_new_memory, fetch_new_knowledge_session, calculator, web_search, get_datetime_now]
-tools_by_name = {tool.name: tool for tool in tools}
 
 ollama_llm_tools = ollama_llm.bind_tools(tools)
 
@@ -468,7 +481,7 @@ async def coding_basic_should_continue(state: State):
         print("END")
         return END 
         
-    return "coding_tools"
+    return "coding_basic_tools"
     
 async def coding_react_should_continue(state: State):
     print("Should continue?")
@@ -699,16 +712,17 @@ async def judge_memory(state: State):
 async def extract_content(message) -> str:
     content = message.content
 
-    if isinstance(content, list): # AI / AI tool call
+    if isinstance(content, list): # AI
         content = " ".join(
             block["text"]
             for block in content
             if isinstance(block, dict) and block.get("type") == "text"
         )
         
-    if isinstance(message, AIMessage) and message.tool_calls:
-        tool_names = [t["name"] for t in message.tool_calls]
-        return f"AI: content: {content}, tool calls: {tool_names}"
+    if isinstance(message, AIMessage):
+        if message.tool_calls: # AI with tool calls
+            tool_names = [t["name"] for t in message.tool_calls]
+            return f"AI: content: {content}, tool calls: {tool_names}"
     
     return content
     
@@ -732,6 +746,68 @@ async def trimming_message(messages):
             trimmed_msg.append({"role": msg.type, "content": extracted_content})
             
     return trimmed_msg
+
+async def stream_content(route, final_query):
+    writer = get_stream_writer()
+    full_text = ""
+    tool_calls = []
+    content_mode = None
+    
+    
+    try:
+        if route == "basic" or route == "coding_basic":
+            async for chunk in ollama_llm_tools.astream(final_query):   
+                if content_mode is None and chunk.content:
+                    content_mode = "list" if isinstance(chunk.content, list) else "str"
+                    
+                if content_mode == "list":
+                    if isinstance(chunk.content, list):
+                        for block in chunk.content:
+                            if isinstance(block, dict) and block.get("type") == "text":
+                                writer({"token": block["text"]})
+                                full_text += block["text"]
+                            
+                elif content_mode == "str":
+                    if isinstance(chunk.content, str) and chunk.content:
+                        writer({"token": chunk.content})
+                        full_text += chunk.content
+                        
+                if chunk.tool_calls:
+                    for tool in chunk.tool_calls:
+                        tool_calls.append(tool)
+                    
+        else:
+            async for chunk in ollama_llm.astream(final_query):   
+                if content_mode is None and chunk.content:
+                    content_mode = "list" if isinstance(chunk.content, list) else "str"
+                    
+                if content_mode == "list":
+                    if isinstance(chunk.content, list):
+                        for block in chunk.content:
+                            if isinstance(block, dict) and block.get("type") == "text":
+                                writer({"token": block["text"]})
+                                full_text += block["text"]
+                            
+                elif content_mode == "str":
+                    if isinstance(chunk.content, str) and chunk.content:
+                        writer({"token": chunk.content})
+                        full_text += chunk.content
+                        
+                if chunk.tool_calls:
+                    for tool in chunk.tool_calls:
+                        tool_calls.append(tool)
+                        
+        if content_mode == "list":
+            full_content = [{"type": "text", "text": full_text}] if full_text else []
+        else:
+            full_content = full_text
+    
+    except Exception as e:
+        traceback.print_exc()
+        
+        return AIMessage(content="Maaf, terjadi kesalahan internal.", tool_calls=tool_calls)
+
+    return AIMessage(content=full_content, tool_calls=tool_calls)
 
 ## RAG (retrieve data from database based on just new query)
 async def rag(state: State):
@@ -886,7 +962,7 @@ async def basic(state: State):
     final_query = [SystemMessage(content=system_query), *messages]
     
     if state["streaming_mode"] == True:
-        pass
+        response = await stream_content(state["route"], final_query)
     else:
         response = await ollama_llm_tools.ainvoke(final_query)
     
@@ -919,7 +995,7 @@ async def coding_basic(state: State):
     final_query = [SystemMessage(content=system_query), *messages]
     
     if state["streaming_mode"] == True:
-        pass
+        response = await stream_content(state["route"], final_query)
     else:
         response = await ollama_llm_tools.ainvoke(final_query)
     
@@ -1003,10 +1079,12 @@ async def coding_end(state: State):
         "reasoning_questions_observation": state["reasoning_questions_observation"],
     })
     
+    final_query = [SystemMessage(content=system_prompt), *messages]
+    
     if state["streaming_mode"] == True:
-        pass
+        response = await stream_content(state["route"], final_query)
     else:
-        response = await ollama_llm.ainvoke([SystemMessage(content=system_prompt), *messages])
+        response = await ollama_llm.ainvoke(final_query)
         
     return {"messages": [response]}
     
@@ -1088,10 +1166,12 @@ async def thinking_end(state: State):
         "reasoning_questions_observation": state["reasoning_questions_observation"]
     })
     
+    final_query = [SystemMessage(content=system_prompt), *messages]
+    
     if state["streaming_mode"] == True:
-        pass
+        response = await stream_content(state["route"], final_query)
     else:
-        response = await ollama_llm.ainvoke([SystemMessage(content=system_prompt), *messages])
+        response = await ollama_llm.ainvoke(final_query)
         
     return {"messages": [response]}
     
