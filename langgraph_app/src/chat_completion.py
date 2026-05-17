@@ -199,12 +199,3 @@ async def chat_workflow(db_pool, input_data: ChatInput, f: Optional[UploadFile] 
         # logger.error(traceback.format_exc())
         traceback.print_exc()
         return {"status": "error", "content": ""}
-                
-async def get_agent_graph():
-    builder = await get_agent()
-    
-    agent = builder.compile()
-    
-    png_graph = agent.get_graph().draw_mermaid_png()
-    with open("output/graph.png", "wb") as f:
-        f.write(png_graph)

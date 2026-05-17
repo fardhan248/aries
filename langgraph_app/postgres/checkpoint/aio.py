@@ -319,7 +319,6 @@ class AsyncPostgresSaver(BasePostgresSaver):
                     ),
                 )
 
-
             copy_json = convert_uuids(copy)
 
             await cur.execute(

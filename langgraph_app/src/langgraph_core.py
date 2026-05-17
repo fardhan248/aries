@@ -467,7 +467,7 @@ async def basic_should_continue(state: State):
 
     if len(tool_calls) == 0:
         print("END")
-        return END 
+        return END
 
     return "basic_tools"
     
@@ -567,12 +567,6 @@ async def check_knowledge_exist(state: State):
                 "append": item_append,
             },
         }
-        
-async def judge_knowledge(state: State):
-    """
-    Judge retrieved documents if there are still relevant or not based on history + prompt query
-    """
-    return {}
 
 ## Fetch knowledge_session node if any
 async def check_knowledge_session_ttl(state: State):
@@ -874,15 +868,11 @@ async def rag(state: State):
         },
     }
 
-async def judge_rag(state: State):
+async def judge_rag_knowledge(state: State):
     """
     Judge retrieved documents if there are still relevant or not based on history + prompt query
     """
     return {}
-
-async def join(state: State):
-    print("Node: join")
-    return state
 
 router_model = ollama_llm.with_structured_output(
     schema=RouterOutput.model_json_schema(), method="json_schema"
@@ -1234,13 +1224,12 @@ async def get_agent():
     builder = StateGraph(State)
     
     builder.add_node("check_knowledge_session_ttl", check_knowledge_session_ttl)
-    builder.add_node("judge_knowledge_session", judge_knowledge_session)
+    # builder.add_node("judge_knowledge_session", judge_knowledge_session)
     builder.add_node("check_knowledge_exist", check_knowledge_exist)
-    builder.add_node("judge_knowledge", judge_knowledge)
     builder.add_node("check_memory_exist_and_fetch", check_memory_exist_and_fetch)
-    builder.add_node("judge_memory", judge_memory)
-    builder.add_node("join", join)
+    # builder.add_node("judge_memory", judge_memory)
     builder.add_node("rag", rag)
+    # builder.add_node("judge_rag_knowledge", judge_rag_knowledge)
     builder.add_node("router", router)
     builder.add_node("basic", basic)
     builder.add_node("coding_basic", coding_basic)
@@ -1256,14 +1245,9 @@ async def get_agent():
     
     
     builder.add_edge(START, "check_knowledge_session_ttl")
-    builder.add_edge(START, "check_knowledge_exist")
     builder.add_edge(START, "check_memory_exist_and_fetch")
-    
-    # builder.add_edge("check_knowledge_session_ttl", "join")
-    # builder.add_edge("check_memory_exist_and_fetch", "join")
+    builder.add_edge(START, "check_knowledge_exist")
     builder.add_edge("check_knowledge_exist", "rag")
-    # builder.add_edge("rag", "join")
-    # builder.add_edge("join", "router")
     
     builder.add_edge(["check_knowledge_session_ttl", "check_memory_exist_and_fetch", "rag"], "router")
     
@@ -1275,11 +1259,6 @@ async def get_agent():
     builder.add_edge("coding_basic_tools", "coding_basic")
     
     # thinking-reasoning (coding and thinking)
-    # builder.add_edge("reasoning", "coding_react")
-    # builder.add_edge("reasoning", "coding_end")
-    # builder.add_edge("reasoning", "thinking_react")
-    # builder.add_edge("reasoning", "thinking_end")
-    # builder.add_conditional_edges("reasoning", lambda s: s["route"], ["coding_react", "coding_end", "thinking_react", "thinking_end"])
     ## coding
     builder.add_conditional_edges("coding_react", coding_react_should_continue, ["coding_react_tools", "reasoning"])
     builder.add_edge("coding_react_tools", "coding_react")
@@ -1290,6 +1269,18 @@ async def get_agent():
     builder.add_edge("thinking_end", END)
     
     return builder
+
+async def get_agent_graph():
+    builder = await get_agent()
+    
+    builder.add_conditional_edges("router", lambda state: state["route"], ["basic", "coding_basic", "reasoning"])
+    builder.add_conditional_edges("reasoning", lambda state: state["route"], ["coding_react", "thinking_react", "coding_end", "thinking_end"])
+    
+    agent = builder.compile()
+    
+    png_graph = agent.get_graph().draw_mermaid_png()
+    with open("output/graph.png", "wb") as f:
+        f.write(png_graph)
 
 
 # For next development

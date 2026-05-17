@@ -77,7 +77,7 @@ async def db_check(results):
 
     except Exception as e:
         results["chromadb_example"] = {"status": "error", "content": str(e)}
-       
+        
     return results
     
 async def health_check(db_pool):
