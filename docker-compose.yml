@@ -17,7 +17,7 @@ services:
                           count: all
                           capabilities: [gpu]
         tty: true
-        entrypoint: ["/bin/sh", "model_files/run_ollama.sh"]
+        entrypoint: ["/bin/sh", "/model_files/run_ollama.sh"]
         restart: no
         
     ollama_embedding:
@@ -38,7 +38,7 @@ services:
                           count: all
                           capabilities: [gpu]
         tty: true
-        entrypoint: ["/bin/sh", "model_files/run_ollama_embedding.sh"]
+        entrypoint: ["/bin/sh", "/model_files/run_ollama_embedding.sh"]
         restart: no
     
     langgraph:

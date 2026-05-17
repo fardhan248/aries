@@ -11,6 +11,6 @@ until ollama list >/dev/null 2>&1; do
 done
 
 echo "Ollama is ready, creating the embedding model..."
-ollama create qwen_embedding -f model_files/Modelfile_embedding
+ollama create qwen_embedding -f /model_files/Modelfile_embedding
 
 wait $OLLAMA_PID

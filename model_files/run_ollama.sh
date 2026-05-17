@@ -11,6 +11,6 @@ until ollama list >/dev/null 2>&1; do
 done
 
 echo "Ollama is ready, creating the LLM model..."
-ollama create qwen_llm -f model_files/Modelfile
+ollama create qwen_llm -f /model_files/Modelfile
 
 wait $OLLAMA_PID
