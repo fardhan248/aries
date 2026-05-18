@@ -6,7 +6,8 @@ from models.ollama_qwen import ollama_embedding
 from langchain_chroma import Chroma
 from langchain_core.documents import Document
 from datetime import datetime, timedelta
-from utils.contextmanager_utils import chroma
+from zoneinfo import ZoneInfo
+import utils.contextmanager_utils as cm
 
 load_dotenv()
 
@@ -21,7 +22,7 @@ splitter = RecursiveCharacterTextSplitter(
 
 async def get_vector_store_chroma(collection: str):
     return Chroma(
-        client=chroma,
+        client=cm.chroma,
         collection_name=collection,
         embedding_function=ollama_embedding,
         collection_metadata={"hnsw:space": "cosine"},
@@ -44,6 +45,7 @@ async def str_to_datetime(date: str):
     except Exception:
         dt = datetime.strptime(date, "%Y-%m-%d %H:%M:%S")
 
+    return dt
 
 async def encrypt(text: str) -> bytes:
     if not isinstance(text, str):
@@ -111,7 +113,7 @@ async def chunk_document(filename, content_type, file_bytes, configurable):
             "thread_id": thread_id,
             "knowledge_id": knowledge_id,
             "chunk_id": str(uuid.uuid4()),
-            "created_at": str(datetime.now()),
+            "created_at": str(datetime.now(ZoneInfo("Asia/Jakarta"))),
         }
         for chunk in chunks
     ]
@@ -121,7 +123,7 @@ async def chunk_document(filename, content_type, file_bytes, configurable):
 ## Upload user_document per chat, add TTL
 async def save_chunks_session_to_db(chunks, metadatas):
     for i in range(len(metadatas)):
-        created_at = str_to_datetime(metadatas[i]["created_at"])
+        created_at = await str_to_datetime(metadatas[i]["created_at"])
         metadatas[i]["expired_at"] = str(created_at + timedelta(days=7))
     
     thread_id = metadatas[0]["thread_id"]
@@ -218,11 +220,24 @@ async def delete_knowledge(tenant_id: str, knowledge_id: str):
         vector_store = await get_vector_store_chroma(f"tenant_{tenant_id.replace('-', '_')}")
         
         collection = vector_store._collection
+        collection_name = collection.name
         
         await asyncio.get_event_loop().run_in_executor(
             None,
             lambda: collection.delete(where={"knowledge_id": knowledge_id})
         )
+        
+        knowledge_ids = await asyncio.get_event_loop().run_in_executor(
+            None,
+            lambda: collection.get(where={"tenant_id": tenant_id}, include=[])
+        )
+
+        if len(knowledge_ids["ids"]) == 0:
+            client = vector_store._client
+            await asyncio.get_event_loop().run_in_executor(
+                None,
+                lambda: client.delete_collection(collection_name)
+            )
         
         return {"status": "success", "content": f"Delete knowledge_id {knowledge_id} success."}
     
@@ -235,11 +250,24 @@ async def delete_knowledge_session(thread_id: str, s_knowledge_id: str):
         vector_store = await get_vector_store_chroma(f"thread_{thread_id.replace('-', '_')}")
         
         collection = vector_store._collection
+        collection_name = collection.name
         
         await asyncio.get_event_loop().run_in_executor(
             None,
             lambda: collection.delete(where={"knowledge_id": s_knowledge_id})
         )
+        
+        knowledge_ids = await asyncio.get_event_loop().run_in_executor(
+            None,
+            lambda: collection.get(where={"thread_id": thread_id}, include=[])
+        )
+        
+        if len(knowledge_ids["ids"]) == 0:
+            client = vector_store._client
+            await asyncio.get_event_loop().run_in_executor(
+                None,
+                lambda: client.delete_collection(collection_name)
+            )
         
         return {"status": "success", "content": f"Delete s_knowledge_id {s_knowledge_id} success."}
     
@@ -252,11 +280,24 @@ async def delete_memory(user_id: str, memory_id: str):
         vector_store = await get_vector_store_chroma(f"user_{user_id.replace('-', '_')}")
         
         collection = vector_store._collection
+        collection_name = collection.name
         
         await asyncio.get_event_loop().run_in_executor(
             None,
             lambda: collection.delete(where={"memory_id": memory_id})
         )
+        
+        knowledge_ids = await asyncio.get_event_loop().run_in_executor(
+            None,
+            lambda: collection.get(where={"user_id": user_id}, include=[])
+        )
+        
+        if len(knowledge_ids["ids"]) == 0:
+            client = vector_store._client
+            await asyncio.get_event_loop().run_in_executor(
+                None,
+                lambda: client.delete_collection(collection_name)
+            )
         
         return {"status": "success", "content": f"Delete memory_id {memory_id} success."}
     

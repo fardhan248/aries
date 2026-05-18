@@ -1,10 +1,11 @@
 from fastapi import Request, APIRouter, UploadFile, File, Form, Body
 from fastapi.responses import StreamingResponse
-from src.chat_completion import streaming, get_agent_graph, chat_workflow
+from src.chat_completion import streaming, chat_workflow
+from src.langgraph_core import get_agent_graph
 from utils.documents_utils import put_new_knowledge, delete_knowledge, delete_knowledge_session, delete_memory
 from typing import Optional
 from src.add_member import new_company, new_user, new_chat
-from body_models.router_models import AddUserInput, ChatInput#, NewChat
+from body_models.router_models import AddUserInput, ChatInput
 from utils.health_check import health_check
 from starlette.datastructures import Headers
 import uuid, json, io
@@ -33,6 +34,7 @@ async def make_new_chat(
     input_data = ChatInput(**json.loads(input_data))
     
     if f is not None:
+        print("Uploaded file")
         file_content = await f.read()
         f2 = UploadFile(
             filename=f.filename,
@@ -81,10 +83,10 @@ async def chat(
         input_data.thread_id = thread_id
     
     if streaming == False:
-        return await chat_workflow(pool, input_data, f)
+        return await chat_workflow(pool, input_data, f) #✅
     
     else:
-        return StreamingResponse(
+        return StreamingResponse( #✅
             streaming(pool, input_data, f), 
             media_type="text/event_stream",
             headers={
@@ -122,25 +124,25 @@ async def upload(request: Request, tenant_id: str, f: UploadFile):
     return await put_new_knowledge(f, tenant_id)
     
 # Delete knowledge
-@router.post("/delete/knowledge/{tenant_id}")
+@router.post("/delete/knowledge/{tenant_id}") #✅
 async def delete_k(tenant_id: str, knowledge_id: str):
     return await delete_knowledge(tenant_id, knowledge_id)
     
 # Delete knowledge session
-@router.post("/delete/knowledge_session/{thread_id}")
+@router.post("/delete/knowledge_session/{thread_id}") #✅
 async def delete_k_s(thread_id: str, s_knowledge_id: str):
     return await delete_knowledge_session(thread_id, s_knowledge_id)
     
 # Delete memory
-@router.post("/delete/memory/{user_id}")
+@router.post("/delete/memory/{user_id}") #✅
 async def delete_m(user_id: str, memory_id: str):
     return await delete_memory(user_id, memory_id)
 
 
-# @router.get("/get_graph") #✅
-# async def get_graph():
-    # await get_agent_graph()
-    # return {"status": "success"}
+@router.get("/get_graph") #✅
+async def get_graph():
+    await get_agent_graph()
+    return {"status": "success"}
     
 
 @router.get("/health") #✅

@@ -17,7 +17,7 @@ services:
                           count: all
                           capabilities: [gpu]
         tty: true
-        entrypoint: ["/bin/sh", "model_files/run_ollama.sh"]
+        entrypoint: ["/bin/sh", "/model_files/run_ollama.sh"]
         restart: no
         
     ollama_embedding:
@@ -38,7 +38,7 @@ services:
                           count: all
                           capabilities: [gpu]
         tty: true
-        entrypoint: ["/bin/sh", "model_files/run_ollama_embedding.sh"]
+        entrypoint: ["/bin/sh", "/model_files/run_ollama_embedding.sh"]
         restart: no
     
     langgraph:
@@ -68,11 +68,7 @@ services:
         environment:
             ANONYMIZED_TELEMETRY: "FALSE"
             IS_PERSISTENT: "TRUE"
-            PERSIST_DIRECTORY: "/chroma/chroma"
             CHROMA_SERVER_HTTP_PORT: "8000"
         volumes:
-            - chroma_data:/chroma/chroma
+            - ./chroma_data:/data
         restart: no
-        
-volumes: 
-    chroma_data:

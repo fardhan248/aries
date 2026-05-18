@@ -4,7 +4,7 @@ from utils.documents_utils import encrypt, decrypt
 from string_utils.prompts import PromptTitle
 from utils.documents_utils import encrypt, decrypt
 from src.chat_completion import streaming, chat_workflow
-from models.gemini import gemini
+from models.ollama_qwen import ollama_llm
 import os, uuid
 
 pool = None
@@ -15,7 +15,7 @@ async def new_company(db_pool, tenant: str):
     global pool
     pool = db_pool
     
-    tenant_id = uuid.uuid4()
+    tenant_id = str(uuid.uuid4())
     
     try:
         await pool.execute(
@@ -29,15 +29,12 @@ async def new_company(db_pool, tenant: str):
         print(e)
         return {"status": "Failed", "values": {}}
     
-async def new_user(db_pool, tenant_id: str | uuid.UUID, user: str, role: str = "user"):
+async def new_user(db_pool, tenant_id: str, user: str, role: str = "user"):
     global pool
     pool = db_pool
     
-    if not isinstance(tenant_id, uuid.UUID):
-        tenant_id = uuid.UUID(tenant_id)
-    
     encrypted_user = await encrypt(user)
-    user_id = uuid.uuid4()
+    user_id = str(uuid.uuid4())
     
     try:
         await pool.execute(
@@ -58,7 +55,7 @@ async def new_chat(db_pool, input_data: dict):
     user_id = input_data.user_id
     tenant_id = input_data.tenant_id
     input_prompt = input_data.input_prompt
-    thread_id = uuid.uuid4()
+    thread_id = str(uuid.uuid4())
 
     try:    
         async with pool.acquire() as conn:
@@ -66,7 +63,7 @@ async def new_chat(db_pool, input_data: dict):
                 "input_prompt": input_prompt,
             })
             
-            title = await gemini.ainvoke(SESSION_TITLE_SYSTEM_QUERY)
+            title = await ollama_llm.ainvoke(SESSION_TITLE_SYSTEM_QUERY)
             encrypted_title = await encrypt(title)
             
             await conn.execute(
