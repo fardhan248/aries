@@ -149,320 +149,320 @@ Tools yang tersedia:
 ## Hasil
 ### Endpoint `/health`
 
-	output:
-	```json
-	{
-	  "ollama_llm": {
-		"status": "success",
-		"content": {
-		  "models": [
-			{
-			  "name": "qwen_llm:latest",
-			  "model": "qwen_llm:latest",
-			  "modified_at": "2026-05-17T10:19:00.0982248Z",
-			  "size": 639446954,
-			  "digest": "09ad5fb1a383f20b7d8fdda04fcea1a08ebe008fe3a2982d9e7b02fed6686c49",
-			  "details": {
-				"parent_model": "",
-				"format": "gguf",
-				"family": "qwen3",
-				"families": [
-				  "qwen3"
-				],
-				"parameter_size": "596.05M",
-				"quantization_level": "Q8_0"
-			  }
-			}
-		  ]
-		}
-	  },
-	  "ollama_embedding": {
-		"status": "success",
-		"content": {
-		  "models": [
-			{
-			  "name": "qwen_embedding:latest",
-			  "model": "qwen_embedding:latest",
-			  "modified_at": "2026-05-17T10:18:10.287941476Z",
-			  "size": 639150858,
-			  "digest": "74aa379231f61b1adc709bf515d79f914fd120e336ca701013e5fde44b44bd9d",
-			  "details": {
-				"parent_model": "",
-				"format": "gguf",
-				"family": "qwen3",
-				"families": [
-				  "qwen3"
-				],
-				"parameter_size": "595.78M",
-				"quantization_level": "Q8_0"
-			  }
-			}
-		  ]
-		}
-	  },
-	  "asyncpg_pool": {
-		"status": "success",
-		"content": true
-	  },
-	  "chromadb": {
-		"status": "success",
-		"content": "{\"nanosecond heartbeat\":1779013508279173283}"
-	  },
-	  "chromadb_example": {
-		"status": "success",
-		"content": []
-	  }
-	}
-	```
-
-### Endpoint `/add_member/add_company`
-
-	Input:
-
-	Request body:
-	```text
-	"company_f"
-	```
-	Curl:
-	```bash
-	curl -X 'POST' \
-	  'http://127.0.0.1:8000/add_member/add_company' \
-	  -H 'accept: application/json' \
-	  -H 'Content-Type: application/json' \
-	  -d '"company_f"'
-	```
-	Output:
-	![Output menambahkan tenant](doc/screenshots/add_company.png)
-	```
-	{
-	  "status": "success",
-	  "values": {
-		"tenant_id": "efb6e1ab-a48a-4aa0-824b-7441231e2a44",
-		"name": "company_f"
-	  }
-	}
-	```
-
-### Endpoint `/add_member/{tenant_id}/add_user`
-
-	Input:
-
-	Path parameter (tenant_id):
-	```text
-	efb6e1ab-a48a-4aa0-824b-7441231e2a44
-	```
-	Request body:
-	```json
-	{
-		"user": "Budi",
-		"role": "user"
-	}
-	```
-	Curl:
-	```bash
-	curl -X 'POST' \
-	  'http://127.0.0.1:8000/add_member/efb6e1ab-a48a-4aa0-824b-7441231e2a44/add_user' \
-	  -H 'accept: application/json' \
-	  -H 'Content-Type: application/json' \
-	  -d '{
-	  "user": "Budi",
-	  "role": "user"
-	}'
-	```
-	output:
-	![Output menambahkan user](doc/screenshots/add_user.png)
-	```
-	{
-	  "status": "success",
-	  "values": {
-		"user_id": "a63e0109-a3a2-46e3-a450-49951e6547d3",
-		"tenant_id": "efb6e1ab-a48a-4aa0-824b-7441231e2a44",
-		"user": "Budi",
-		"role": "user"
-	  }
-	}
-	```
-
-### Endpoint `/ingest/{tenant_id}`
-
-	Input:
-
-	Parameter (tenant_id):
-	```text
-	efb6e1ab-a48a-4aa0-824b-7441231e2a44
-	```
-	Request body:
-	```text
-	f (file upload): Portofolio.pdf
-	```
-	Curl:
-	```bash
-	curl -X 'POST' \
-	  'http://127.0.0.1:8000/ingest/efb6e1ab-a48a-4aa0-824b-7441231e2a44' \
-	  -H 'accept: application/json' \
-	  -H 'Content-Type: multipart/form-data' \
-	  -F 'f=@Portofolio.pdf;type=application/pdf'
-	```
-	output:
-	![Output menambahkan dokumen](doc/screenshots/ingest.png)
-	```
-	{
-	  "status": "success",
-	  "knowledge_id": "dcfe059e-0773-4b7c-b98d-1731f4928907",
-	  "tenant_id": "efb6e1ab-a48a-4aa0-824b-7441231e2a44",
-	  "chunk_ids": [
-		"46a72bac-4e16-42a3-86ec-a0c5f39da3c9",
-		"8cdf0ff9-c391-44f4-9aaa-8df7cd8b8120",
-		"4f914b80-9261-4ab4-9147-5d3d9d3361fa",
-		"c810c899-7b8b-4dd9-9b23-5c39fd1e9174",
-		"efd7a581-f736-422c-a4da-874a8bcf500f",
-		"ca237fe9-6717-401e-81fc-53ed4577457f",
-		"a9e4979b-b13a-43e3-a33d-13240a455a0c"
-	  ],
-	  "metadata": [
+output:
+```json
+{
+  "ollama_llm": {
+	"status": "success",
+	"content": {
+	  "models": [
 		{
-		  "filename": "Portofolio.pdf",
-		  "content_type": "application/pdf",
-		  "len_pages": 3,
-		  "number_chunks": 7,
-		  "len_char": 481,
-		  "tenant_id": "efb6e1ab-a48a-4aa0-824b-7441231e2a44",
-		  "user_id": null,
-		  "thread_id": null,
-		  "knowledge_id": "dcfe059e-0773-4b7c-b98d-1731f4928907",
-		  "chunk_id": "46a72bac-4e16-42a3-86ec-a0c5f39da3c9",
-		  "created_at": "2026-05-17 15:14:26.666506"
-		},
-		{
-		  "filename": "Portofolio.pdf",
-		  "content_type": "application/pdf",
-		  "len_pages": 3,
-		  "number_chunks": 7,
-		  "len_char": 498,
-		  "tenant_id": "efb6e1ab-a48a-4aa0-824b-7441231e2a44",
-		  "user_id": null,
-		  "thread_id": null,
-		  "knowledge_id": "dcfe059e-0773-4b7c-b98d-1731f4928907",
-		  "chunk_id": "8cdf0ff9-c391-44f4-9aaa-8df7cd8b8120",
-		  "created_at": "2026-05-17 15:14:26.666682"
-		},
-		{
-		  "filename": "Portofolio.pdf",
-		  "content_type": "application/pdf",
-		  "len_pages": 3,
-		  "number_chunks": 7,
-		  "len_char": 474,
-		  "tenant_id": "efb6e1ab-a48a-4aa0-824b-7441231e2a44",
-		  "user_id": null,
-		  "thread_id": null,
-		  "knowledge_id": "dcfe059e-0773-4b7c-b98d-1731f4928907",
-		  "chunk_id": "4f914b80-9261-4ab4-9147-5d3d9d3361fa",
-		  "created_at": "2026-05-17 15:14:26.666692"
-		},
-		{
-		  "filename": "Portofolio.pdf",
-		  "content_type": "application/pdf",
-		  "len_pages": 3,
-		  "number_chunks": 7,
-		  "len_char": 465,
-		  "tenant_id": "efb6e1ab-a48a-4aa0-824b-7441231e2a44",
-		  "user_id": null,
-		  "thread_id": null,
-		  "knowledge_id": "dcfe059e-0773-4b7c-b98d-1731f4928907",
-		  "chunk_id": "c810c899-7b8b-4dd9-9b23-5c39fd1e9174",
-		  "created_at": "2026-05-17 15:14:26.666699"
-		},
-		{
-		  "filename": "Portofolio.pdf",
-		  "content_type": "application/pdf",
-		  "len_pages": 3,
-		  "number_chunks": 7,
-		  "len_char": 441,
-		  "tenant_id": "efb6e1ab-a48a-4aa0-824b-7441231e2a44",
-		  "user_id": null,
-		  "thread_id": null,
-		  "knowledge_id": "dcfe059e-0773-4b7c-b98d-1731f4928907",
-		  "chunk_id": "efd7a581-f736-422c-a4da-874a8bcf500f",
-		  "created_at": "2026-05-17 15:14:26.666712"
-		},
-		{
-		  "filename": "Portofolio.pdf",
-		  "content_type": "application/pdf",
-		  "len_pages": 3,
-		  "number_chunks": 7,
-		  "len_char": 477,
-		  "tenant_id": "efb6e1ab-a48a-4aa0-824b-7441231e2a44",
-		  "user_id": null,
-		  "thread_id": null,
-		  "knowledge_id": "dcfe059e-0773-4b7c-b98d-1731f4928907",
-		  "chunk_id": "ca237fe9-6717-401e-81fc-53ed4577457f",
-		  "created_at": "2026-05-17 15:14:26.666718"
-		},
-		{
-		  "filename": "Portofolio.pdf",
-		  "content_type": "application/pdf",
-		  "len_pages": 3,
-		  "number_chunks": 7,
-		  "len_char": 211,
-		  "tenant_id": "efb6e1ab-a48a-4aa0-824b-7441231e2a44",
-		  "user_id": null,
-		  "thread_id": null,
-		  "knowledge_id": "dcfe059e-0773-4b7c-b98d-1731f4928907",
-		  "chunk_id": "a9e4979b-b13a-43e3-a33d-13240a455a0c",
-		  "created_at": "2026-05-17 15:14:26.666724"
+		  "name": "qwen_llm:latest",
+		  "model": "qwen_llm:latest",
+		  "modified_at": "2026-05-17T10:19:00.0982248Z",
+		  "size": 639446954,
+		  "digest": "09ad5fb1a383f20b7d8fdda04fcea1a08ebe008fe3a2982d9e7b02fed6686c49",
+		  "details": {
+			"parent_model": "",
+			"format": "gguf",
+			"family": "qwen3",
+			"families": [
+			  "qwen3"
+			],
+			"parameter_size": "596.05M",
+			"quantization_level": "Q8_0"
+		  }
 		}
 	  ]
 	}
-	```
+  },
+  "ollama_embedding": {
+	"status": "success",
+	"content": {
+	  "models": [
+		{
+		  "name": "qwen_embedding:latest",
+		  "model": "qwen_embedding:latest",
+		  "modified_at": "2026-05-17T10:18:10.287941476Z",
+		  "size": 639150858,
+		  "digest": "74aa379231f61b1adc709bf515d79f914fd120e336ca701013e5fde44b44bd9d",
+		  "details": {
+			"parent_model": "",
+			"format": "gguf",
+			"family": "qwen3",
+			"families": [
+			  "qwen3"
+			],
+			"parameter_size": "595.78M",
+			"quantization_level": "Q8_0"
+		  }
+		}
+	  ]
+	}
+  },
+  "asyncpg_pool": {
+	"status": "success",
+	"content": true
+  },
+  "chromadb": {
+	"status": "success",
+	"content": "{\"nanosecond heartbeat\":1779013508279173283}"
+  },
+  "chromadb_example": {
+	"status": "success",
+	"content": []
+  }
+}
+```
+
+### Endpoint `/add_member/add_company`
+
+Input:
+
+Request body:
+```text
+"company_f"
+```
+Curl:
+```bash
+curl -X 'POST' \
+  'http://127.0.0.1:8000/add_member/add_company' \
+  -H 'accept: application/json' \
+  -H 'Content-Type: application/json' \
+  -d '"company_f"'
+```
+Output:
+![Output menambahkan tenant](doc/screenshots/add_company.png)
+```
+{
+  "status": "success",
+  "values": {
+	"tenant_id": "efb6e1ab-a48a-4aa0-824b-7441231e2a44",
+	"name": "company_f"
+  }
+}
+```
+
+### Endpoint `/add_member/{tenant_id}/add_user`
+
+Input:
+
+Path parameter (tenant_id):
+```text
+efb6e1ab-a48a-4aa0-824b-7441231e2a44
+```
+Request body:
+```json
+{
+	"user": "Budi",
+	"role": "user"
+}
+```
+Curl:
+```bash
+curl -X 'POST' \
+  'http://127.0.0.1:8000/add_member/efb6e1ab-a48a-4aa0-824b-7441231e2a44/add_user' \
+  -H 'accept: application/json' \
+  -H 'Content-Type: application/json' \
+  -d '{
+  "user": "Budi",
+  "role": "user"
+}'
+```
+output:
+![Output menambahkan user](doc/screenshots/add_user.png)
+```
+{
+  "status": "success",
+  "values": {
+	"user_id": "a63e0109-a3a2-46e3-a450-49951e6547d3",
+	"tenant_id": "efb6e1ab-a48a-4aa0-824b-7441231e2a44",
+	"user": "Budi",
+	"role": "user"
+  }
+}
+```
+
+### Endpoint `/ingest/{tenant_id}`
+
+Input:
+
+Parameter (tenant_id):
+```text
+efb6e1ab-a48a-4aa0-824b-7441231e2a44
+```
+Request body:
+```text
+f (file upload): Portofolio.pdf
+```
+Curl:
+```bash
+curl -X 'POST' \
+  'http://127.0.0.1:8000/ingest/efb6e1ab-a48a-4aa0-824b-7441231e2a44' \
+  -H 'accept: application/json' \
+  -H 'Content-Type: multipart/form-data' \
+  -F 'f=@Portofolio.pdf;type=application/pdf'
+```
+output:
+![Output menambahkan dokumen](doc/screenshots/ingest.png)
+```
+{
+  "status": "success",
+  "knowledge_id": "dcfe059e-0773-4b7c-b98d-1731f4928907",
+  "tenant_id": "efb6e1ab-a48a-4aa0-824b-7441231e2a44",
+  "chunk_ids": [
+	"46a72bac-4e16-42a3-86ec-a0c5f39da3c9",
+	"8cdf0ff9-c391-44f4-9aaa-8df7cd8b8120",
+	"4f914b80-9261-4ab4-9147-5d3d9d3361fa",
+	"c810c899-7b8b-4dd9-9b23-5c39fd1e9174",
+	"efd7a581-f736-422c-a4da-874a8bcf500f",
+	"ca237fe9-6717-401e-81fc-53ed4577457f",
+	"a9e4979b-b13a-43e3-a33d-13240a455a0c"
+  ],
+  "metadata": [
+	{
+	  "filename": "Portofolio.pdf",
+	  "content_type": "application/pdf",
+	  "len_pages": 3,
+	  "number_chunks": 7,
+	  "len_char": 481,
+	  "tenant_id": "efb6e1ab-a48a-4aa0-824b-7441231e2a44",
+	  "user_id": null,
+	  "thread_id": null,
+	  "knowledge_id": "dcfe059e-0773-4b7c-b98d-1731f4928907",
+	  "chunk_id": "46a72bac-4e16-42a3-86ec-a0c5f39da3c9",
+	  "created_at": "2026-05-17 15:14:26.666506"
+	},
+	{
+	  "filename": "Portofolio.pdf",
+	  "content_type": "application/pdf",
+	  "len_pages": 3,
+	  "number_chunks": 7,
+	  "len_char": 498,
+	  "tenant_id": "efb6e1ab-a48a-4aa0-824b-7441231e2a44",
+	  "user_id": null,
+	  "thread_id": null,
+	  "knowledge_id": "dcfe059e-0773-4b7c-b98d-1731f4928907",
+	  "chunk_id": "8cdf0ff9-c391-44f4-9aaa-8df7cd8b8120",
+	  "created_at": "2026-05-17 15:14:26.666682"
+	},
+	{
+	  "filename": "Portofolio.pdf",
+	  "content_type": "application/pdf",
+	  "len_pages": 3,
+	  "number_chunks": 7,
+	  "len_char": 474,
+	  "tenant_id": "efb6e1ab-a48a-4aa0-824b-7441231e2a44",
+	  "user_id": null,
+	  "thread_id": null,
+	  "knowledge_id": "dcfe059e-0773-4b7c-b98d-1731f4928907",
+	  "chunk_id": "4f914b80-9261-4ab4-9147-5d3d9d3361fa",
+	  "created_at": "2026-05-17 15:14:26.666692"
+	},
+	{
+	  "filename": "Portofolio.pdf",
+	  "content_type": "application/pdf",
+	  "len_pages": 3,
+	  "number_chunks": 7,
+	  "len_char": 465,
+	  "tenant_id": "efb6e1ab-a48a-4aa0-824b-7441231e2a44",
+	  "user_id": null,
+	  "thread_id": null,
+	  "knowledge_id": "dcfe059e-0773-4b7c-b98d-1731f4928907",
+	  "chunk_id": "c810c899-7b8b-4dd9-9b23-5c39fd1e9174",
+	  "created_at": "2026-05-17 15:14:26.666699"
+	},
+	{
+	  "filename": "Portofolio.pdf",
+	  "content_type": "application/pdf",
+	  "len_pages": 3,
+	  "number_chunks": 7,
+	  "len_char": 441,
+	  "tenant_id": "efb6e1ab-a48a-4aa0-824b-7441231e2a44",
+	  "user_id": null,
+	  "thread_id": null,
+	  "knowledge_id": "dcfe059e-0773-4b7c-b98d-1731f4928907",
+	  "chunk_id": "efd7a581-f736-422c-a4da-874a8bcf500f",
+	  "created_at": "2026-05-17 15:14:26.666712"
+	},
+	{
+	  "filename": "Portofolio.pdf",
+	  "content_type": "application/pdf",
+	  "len_pages": 3,
+	  "number_chunks": 7,
+	  "len_char": 477,
+	  "tenant_id": "efb6e1ab-a48a-4aa0-824b-7441231e2a44",
+	  "user_id": null,
+	  "thread_id": null,
+	  "knowledge_id": "dcfe059e-0773-4b7c-b98d-1731f4928907",
+	  "chunk_id": "ca237fe9-6717-401e-81fc-53ed4577457f",
+	  "created_at": "2026-05-17 15:14:26.666718"
+	},
+	{
+	  "filename": "Portofolio.pdf",
+	  "content_type": "application/pdf",
+	  "len_pages": 3,
+	  "number_chunks": 7,
+	  "len_char": 211,
+	  "tenant_id": "efb6e1ab-a48a-4aa0-824b-7441231e2a44",
+	  "user_id": null,
+	  "thread_id": null,
+	  "knowledge_id": "dcfe059e-0773-4b7c-b98d-1731f4928907",
+	  "chunk_id": "a9e4979b-b13a-43e3-a33d-13240a455a0c",
+	  "created_at": "2026-05-17 15:14:26.666724"
+	}
+  ]
+}
+```
 
 ### Endpoint `/chat/new`
 
-	Input:
+Input:
 
-	Request body: input_data (string)
-	```json
-	{
-		"tenant_id": "efb6e1ab-a48a-4aa0-824b-7441231e2a44", 
-		"user_id": "a63e0109-a3a2-46e3-a450-49951e6547d3", 
-		"input_prompt": "Halo, apa kabar? Tolong rangkum dokumen tentang portofolio.", 
-		"mode": "fast", 
-		"streaming": false
-	}
-	```
-	output:
-	![Output membuat chat baru](doc/screenshots/chat_new.png)
-	```
-	{
-	  "thread_id": "b24f1629-c733-479a-8b7c-057034c963e2",
-	  "content": "Halo! Kabar saya baik, terima kasih sudah bertanya. Semoga Anda juga sehat selalu.\n\nBerikut adalah rangkuman dari portofolio Fardhan Indrayesa (2025-2026):\n\n**1. Proyek INDISMART (2025-2026)**\n*   **Face Recognition:** Mengembangkan sistem absensi dengan mengganti model deteksi wajah (dari MTCNN ke MediaPipe) agar lebih cepat dan akurat, serta mengintegrasikannya dengan database absensi.\n*   **Trip Planner (2026):** Mengembangkan algoritma untuk rekomendasi destinasi wisata menggunakan *Linear Programming* untuk filter destinasi dan algoritma *Greedy* untuk optimasi rute. Sistem ini juga menyertakan fitur pencarian akomodasi terdekat (hotel dan restoran).\n\n**2. Proyek BBPVP Bandung (2025)**\n*   **Website Chatbot:** Membangun chatbot AI berbasis ChatGPT menggunakan *n8n* yang terintegrasi dengan database Supabase dan API cuaca.\n*   **Telegram Chatbot:** Membangun chatbot berbasis Gemini AI yang terintegrasi dengan Google Spreadsheet dan API cuaca.\n*   **Content Generator:** Membuat sistem otomatisasi konten di *n8n* yang menggabungkan Google Spreadsheet, Gemini AI (teks & gambar), dan Google Drive dengan pemicu berbasis waktu.\n\nSecara umum, portofolio ini menunjukkan keahlian Fardhan dalam otomatisasi alur kerja (*n8n*), pengembangan AI (*LLM orchestration*), integrasi database, dan penerapan algoritma untuk optimasi sistem.\n\nApakah ada bagian spesifik dari portofolio ini yang ingin Anda ketahui lebih lanjut?"
-	}
-	```
+Request body: input_data (string)
+```json
+{
+	"tenant_id": "efb6e1ab-a48a-4aa0-824b-7441231e2a44", 
+	"user_id": "a63e0109-a3a2-46e3-a450-49951e6547d3", 
+	"input_prompt": "Halo, apa kabar? Tolong rangkum dokumen tentang portofolio.", 
+	"mode": "fast", 
+	"streaming": false
+}
+```
+output:
+![Output membuat chat baru](doc/screenshots/chat_new.png)
+```
+{
+  "thread_id": "b24f1629-c733-479a-8b7c-057034c963e2",
+  "content": "Halo! Kabar saya baik, terima kasih sudah bertanya. Semoga Anda juga sehat selalu.\n\nBerikut adalah rangkuman dari portofolio Fardhan Indrayesa (2025-2026):\n\n**1. Proyek INDISMART (2025-2026)**\n*   **Face Recognition:** Mengembangkan sistem absensi dengan mengganti model deteksi wajah (dari MTCNN ke MediaPipe) agar lebih cepat dan akurat, serta mengintegrasikannya dengan database absensi.\n*   **Trip Planner (2026):** Mengembangkan algoritma untuk rekomendasi destinasi wisata menggunakan *Linear Programming* untuk filter destinasi dan algoritma *Greedy* untuk optimasi rute. Sistem ini juga menyertakan fitur pencarian akomodasi terdekat (hotel dan restoran).\n\n**2. Proyek BBPVP Bandung (2025)**\n*   **Website Chatbot:** Membangun chatbot AI berbasis ChatGPT menggunakan *n8n* yang terintegrasi dengan database Supabase dan API cuaca.\n*   **Telegram Chatbot:** Membangun chatbot berbasis Gemini AI yang terintegrasi dengan Google Spreadsheet dan API cuaca.\n*   **Content Generator:** Membuat sistem otomatisasi konten di *n8n* yang menggabungkan Google Spreadsheet, Gemini AI (teks & gambar), dan Google Drive dengan pemicu berbasis waktu.\n\nSecara umum, portofolio ini menunjukkan keahlian Fardhan dalam otomatisasi alur kerja (*n8n*), pengembangan AI (*LLM orchestration*), integrasi database, dan penerapan algoritma untuk optimasi sistem.\n\nApakah ada bagian spesifik dari portofolio ini yang ingin Anda ketahui lebih lanjut?"
+}
+```
 
 ### Endpoint `/chat/{thread_id}`
 
-	Input:
+Input:
 
-	Parameter (thread_id):
-	```text
-	b24f1629-c733-479a-8b7c-057034c963e2
-	```
-	Request body: input_data (string)
-	```json
-	{
-		"tenant_id": "efb6e1ab-a48a-4aa0-824b-7441231e2a44", 
-		"user_id": "a63e0109-a3a2-46e3-a450-49951e6547d3",
-		"thread_id": "b24f1629-c733-479a-8b7c-057034c963e2",
-		"input_prompt": "Tanggal berapa sekarang?", 
-		"mode": "fast", 
-		"streaming": false
-	}
-	```
+Parameter (thread_id):
+```text
+b24f1629-c733-479a-8b7c-057034c963e2
+```
+Request body: input_data (string)
+```json
+{
+	"tenant_id": "efb6e1ab-a48a-4aa0-824b-7441231e2a44", 
+	"user_id": "a63e0109-a3a2-46e3-a450-49951e6547d3",
+	"thread_id": "b24f1629-c733-479a-8b7c-057034c963e2",
+	"input_prompt": "Tanggal berapa sekarang?", 
+	"mode": "fast", 
+	"streaming": false
+}
+```
 
-	output:
-	![Output melanjutkan chat yang sudah ada](doc/screenshots/chat_thread.png)
-	```
-	{
-	  "thread_id": "b24f1629-c733-479a-8b7c-057034c963e2",
-	  "content": "Saat ini adalah hari Senin, 18 Mei 2026."
-	}
-	```
+output:
+![Output melanjutkan chat yang sudah ada](doc/screenshots/chat_thread.png)
+```
+{
+  "thread_id": "b24f1629-c733-479a-8b7c-057034c963e2",
+  "content": "Saat ini adalah hari Senin, 18 Mei 2026."
+}
+```
