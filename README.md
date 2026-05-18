@@ -118,7 +118,7 @@ http://localhost:8000/docs
 
 ## Arsitektur
 ![Workflow Chatbot](langgraph_app/output/graph.png)
-Chatbot RAG yang context-aware dibuat dengan menggunakan framework Langchain-Langgraph dan menggunakan ChromaDB sebagai vector database. Fitur yang tersedia pada chatbot ini, di antaranya fitur untuk chat streaming maupun chat biasa, berbagai tools seperti get datetime dan web search, penambahan memory secara otomatis oleh LLM, dan upload file per session.
+Chatbot-aries merupakan Chatbot RAG yang context-aware dibuat dengan menggunakan framework Langchain-Langgraph dan menggunakan ChromaDB sebagai vector database. Fitur yang tersedia pada chatbot ini, di antaranya fitur untuk chat streaming maupun chat biasa, berbagai tools seperti get datetime dan web search, penambahan memory secara otomatis oleh LLM, dan upload file per session.
 
 Sekilas tentang Langgraph:
 - **Langgraph**: Framework open source dari LangChain untuk membangun dan mengelola alur AI Agent dengan struktur berbasis graf.
@@ -126,14 +126,14 @@ Sekilas tentang Langgraph:
 - **Checkpoint**: Berguna untuk mempertahankan data state di dalam dan di seluruh interaksi sistem graf.
 
 Penjelasan workflow dan node:
-- Ketika user mengirim prompt, node langgraph otomatis mengecek riwayat percakapan sebelumnya, apakah ada knowledge (**tenant knowledge**, **session knowledge**, **memory**) yang pernah dibahas dalam session itu atau tidak. Jika terdapat knowledge, maka chunk setiap knowledge akan di fetch ke dalam state Langgraph. Data chunk tidak disimpan ke database checkpoint Langgraph karena untuk efisiensi penggunaan storage database serta interaksi antara checkpoint Langgraph dengan database yang lebih lancar. 
-- kemudian, pada node **RAG**, prompt user akan diproses oleh LLM untuk direkonstruksi query-nya agar query yang di-embed ke vector memiliki makna semantik yang sesuai dengan knowledge yang ada di vector database. Untuk menghindari duplikasi, di node ini juga terdapat logic untuk fallback ketika terdapat chunk_id yang sudah ada di state Langgraph agar tidak duplikat.
-- Setelah itu, knowledge yang tersedia dan prompt dari user di-query ke LLM yang ada di node **router**. Node ini berperan untuk mengarahkan workflow, agent mana yang akan digunakan sesuai dengan query user. Terdapat route **basic**, **coding basic**, dan **reasoning** (**thinking react** dan **coding react**).
-- Route **basic** dan **coding basic** hanya menjawab pertanyaan yang sederhana dari user. Disediakan pula node **tools** yang dapat diakses oleh LLM.
-- Route **reasoning** menjawab pertanyaan dari user yang membutuhkan pemikiran mendalam, analisis masalah yang kompleks, serta problem solving yang kuat. Pada state Langgraph terdapat data "route" sebagai arah bagi workflow untuk mengarahkan antara **coding react** atau **thinking react**.
-- Pada node **reasoning**, query dari user diproses menjadi bentuk pertanyaan yang lebih dalam, lalu pertanyaan tersebut dijawab di node **coding/thinking react**. Node **react** ini terhubung dengan node **tools**, sehingga LLM pada node **react** dapat menjawab dengan lebih substansial terhadap pertanyaan yang dibuat pada node **reasoning**.
-- Setelah jawaban dibuat, node **reasoning** memproses hasil observasi node **react** untuk dibuat pertanyaan lanjutan sampai 3 kali, supaya jawaban yang dihasilkan ke user lebih komprehensif.
-- Setelah iterasi dilakukan sebanyak 3 kali, node **reasoning** langsung menuju node **coding/thinking end**. Di node **end** ini, pertanyaan hasil reasoning dan jawaban hasil observasi di node **reasoning** dan **react**, disimpulkan secara lebih ringkas namun tetap jelas untuk disampaikan kepada user.
+- Ketika user mengirim prompt, node langgraph otomatis mengecek riwayat percakapan sebelumnya, apakah ada knowledge (**`tenant knowledge`**, **`session knowledge`**, **`memory`**) yang pernah dibahas dalam session itu atau tidak. Jika terdapat knowledge, maka chunk setiap knowledge akan di fetch ke dalam state Langgraph. Data chunk tidak disimpan ke database checkpoint Langgraph karena untuk efisiensi penggunaan storage database serta interaksi antara checkpoint Langgraph dengan database yang lebih lancar. 
+- kemudian, pada node **`RAG`**, prompt user akan diproses oleh LLM untuk direkonstruksi query-nya agar query yang di-embed ke vector memiliki makna semantik yang sesuai dengan knowledge yang ada di vector database. Untuk menghindari duplikasi, di node ini juga terdapat logic untuk fallback ketika terdapat chunk_id yang sudah ada di state Langgraph agar tidak duplikat.
+- Setelah itu, knowledge yang tersedia dan prompt dari user di-query ke LLM yang ada di node **`router`**. Node ini berperan untuk mengarahkan workflow, agent mana yang akan digunakan sesuai dengan query user. Terdapat route **`basic`**, **`coding basic`**, dan **`reasoning`** (**`thinking react`** dan **`coding react`**).
+- Route **`basic`** dan **`coding basic`** hanya menjawab pertanyaan yang sederhana dari user. Disediakan pula node **`tools`** yang dapat diakses oleh LLM.
+- Route **`reasoning`** menjawab pertanyaan dari user yang membutuhkan pemikiran mendalam, analisis masalah yang kompleks, serta problem solving yang kuat. Pada state Langgraph terdapat data "route" sebagai arah bagi workflow untuk mengarahkan antara **`coding react`** atau **`thinking react`**.
+- Pada node **`reasoning`**, query dari user diproses menjadi bentuk pertanyaan yang lebih dalam, lalu pertanyaan tersebut dijawab di node **`coding/thinking react`**. Node **`react`** ini terhubung dengan node **`tools`**, sehingga LLM pada node **`react`** dapat menjawab dengan lebih substansial terhadap pertanyaan yang dibuat pada node **`reasoning`**.
+- Setelah jawaban dibuat, node **`reasoning`** memproses hasil observasi node **`react`** untuk dibuat pertanyaan lanjutan sampai 3 kali, supaya jawaban yang dihasilkan ke user lebih komprehensif.
+- Setelah iterasi dilakukan sebanyak 3 kali, node **`reasoning`** langsung menuju node **`coding/thinking end`**. Di node **`end`** ini, pertanyaan hasil reasoning dan jawaban hasil observasi di node **`reasoning`** dan **`react`**, disimpulkan secara lebih ringkas namun tetap jelas untuk disampaikan kepada user.
 
 Tools yang tersedia:
 | Function | Deskripsi |
