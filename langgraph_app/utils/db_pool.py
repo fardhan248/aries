@@ -25,7 +25,8 @@ async def init_db_pool():
                 dsn=database_url,
                 min_size=2,
                 max_size=10,
-                max_inactive_connection_lifetime=500,
+                max_inactive_connection_lifetime=30,
+                max_cached_statement_lifetime=0,
                 init=init_conn,
             )
             
