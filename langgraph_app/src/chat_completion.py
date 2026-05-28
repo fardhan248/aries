@@ -100,7 +100,7 @@ async def streaming(db_pool, input_data: ChatInput, f: Optional[UploadFile] = No
                         yield json.dumps({"type": "token", "content": chunk["data"]["token"]})
                             
             
-            yield f"data: {json.dumps({'type': 'done', "thread_id": thread_id})}"
+            yield f"data: {json.dumps({'type': 'done', 'thread_id': thread_id})}"
             
     except Exception as e:
         # logger.error(traceback.format_exc())
