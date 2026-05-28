@@ -20,12 +20,20 @@ cd aries
 wget -P ./model_files/ https://huggingface.co/Qwen/Qwen3-Embedding-0.6B-GGUF/resolve/main/Qwen3-Embedding-0.6B-Q8_0.gguf https://huggingface.co/Qwen/Qwen3-0.6B-GGUF/resolve/main/Qwen3-0.6B-Q8_0.gguf
 ```
 
-6. Run docker compose dengan perintah
+6. Di WSL/Linux, ketik perintah berikut
+```
+dos2unix model_files/run_ollama.sh
+```
+```
+dos2unix model_files/run_ollama_embedding.sh
+```
+
+7. Run docker compose dengan perintah
 ```
 docker compose -f docker-compose.yml up -d
 ```
 
-7. Buka Swagger FastAPI, dengan menyalin link berikut ke browser
+8. Buka Swagger FastAPI, dengan menyalin link berikut ke browser
 ```
 http://localhost:8000/docs
 ```
