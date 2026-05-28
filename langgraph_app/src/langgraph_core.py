@@ -827,7 +827,7 @@ async def rag(state: State):
     # Retrieve from the database
     vector_store = await get_vector_store_chroma(f"tenant_{tenant_id.replace('-', '_')}")
     retriever = await get_vector_store_retriever(vector_store)
-    results = await retriever.ainvoke(llm_output.content[0]["text"])
+    results = await retriever.ainvoke(llm_output.content)
     
     if len(results) == 0:
         return {}
@@ -1034,11 +1034,11 @@ async def coding_react(state: State):
         return {
             "messages": [
                 AIMessage(content=f"Action: query('{msg}')"), 
-                AIMessage(content=f"Observation: {result.content[0]['text']}")
+                AIMessage(content=f"Observation: {result.content}")
             ],
             "last_query": msg,
             "iteration": state.get("iteration", 0) + 1,
-            "reasoning_questions_observation": [{"question": msg, "observation": result.content[0]['text']}],
+            "reasoning_questions_observation": [{"question": msg, "observation": result.content}],
         }
     
 ## Agent: Coding end (conclusion)
@@ -1121,11 +1121,11 @@ async def thinking_react(state: State):
         return {
             "messages": [
                 AIMessage(content=f"Action: query('{msg}')"), 
-                AIMessage(content=f"Observation: {result.content[0]['text']}")
+                AIMessage(content=f"Observation: {result.content}")
             ],
             "last_query": msg,
             "iteration": state.get("iteration", 0) + 1,
-            "reasoning_questions_observation": [{"question": msg, "observation": result.content[0]['text']}],
+            "reasoning_questions_observation": [{"question": msg, "observation": result.content}],
         }
     
 ## Agent: Thinking end (conclusion)
@@ -1202,7 +1202,7 @@ async def reasoning(state: State):
         return Command(
             goto=state["route"],
             update={
-                "messages": [AIMessage(content=f"Thought: {decision.content[0]['text']}")],
+                "messages": [AIMessage(content=f"Thought: {decision.content}")],
                 "iteration": iteration,
             }
         )
@@ -1210,7 +1210,7 @@ async def reasoning(state: State):
     return Command(
         goto=node_end,
         update={
-            "messages": [AIMessage(content=f"Thought: {decision.content[0]['text']}")],
+            "messages": [AIMessage(content=f"Thought: {decision.content}")],
             "iteration": iteration,
         }
     )

@@ -189,7 +189,7 @@ async def chat_workflow(db_pool, input_data: ChatInput, f: Optional[UploadFile] 
                 )
                 
                 try:
-                    text = message_to_dict(result_agent["messages"][-1])["data"]["content"][0]["text"]
+                    text = message_to_dict(result_agent["messages"][-1])["data"]["content"]
                 except Exception as e:
                     print(e)
                     text = message_to_dict(result_agent["messages"][-1])
