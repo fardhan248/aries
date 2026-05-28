@@ -17,7 +17,7 @@ cd aries
 
 5. Download Model LLM dan Embedding dari Hugging Face
 ```
-wget -P ./model_files/ https://huggingface.co/Qwen/Qwen3-Embedding-0.6B-GGUF/resolve/main/Qwen3-Embedding-0.6B-Q8_0.gguf https://huggingface.co/Qwen/Qwen3-0.6B-GGUF/resolve/main/Qwen3-0.6B-Q8_0.gguf
+wget -P ./model_files/ https://huggingface.co/Qwen/Qwen3-Embedding-4B-GGUF/resolve/main/Qwen3-Embedding-4B-Q6_K.gguf https://huggingface.co/Qwen/Qwen3-4B-GGUF/resolve/main/Qwen3-4B-Q6_K.gguf
 ```
 
 6. Di WSL/Linux, ketik perintah berikut
